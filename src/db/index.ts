@@ -54,16 +54,25 @@ CREATE TABLE IF NOT EXISTS goals (
 );
 `;
 
-type DrizzleDb = BetterSQLite3Database<typeof schema>;
+export type DrizzleDb = BetterSQLite3Database<typeof schema>;
 
 declare global {
   var __calorieLoggerDb: DrizzleDb | undefined;
+  var __calorieLoggerSqlite: Database.Database | undefined;
 }
 
-function createDb(): DrizzleDb {
-  const dataDir = path.join(process.cwd(), "data");
-  fs.mkdirSync(dataDir, { recursive: true });
-  const sqlite = new Database(path.join(dataDir, "app.db"));
+function resolveDbPath(dbFilePath?: string): string {
+  if (dbFilePath) return dbFilePath;
+  if (process.env.CALORIE_LOGGER_DB_PATH) {
+    return process.env.CALORIE_LOGGER_DB_PATH;
+  }
+  return path.join(process.cwd(), "data", "app.db");
+}
+
+function createDb(dbFilePath?: string): DrizzleDb {
+  const filePath = resolveDbPath(dbFilePath);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const sqlite = new Database(filePath);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   sqlite.exec(DDL);
@@ -112,9 +121,56 @@ function createDb(): DrizzleDb {
     seedAll();
   }
 
+  globalThis.__calorieLoggerSqlite = sqlite;
   return drizzle(sqlite, { schema });
 }
 
-// Reuse the connection across Next.js hot reloads / route modules
-export const db: DrizzleDb = globalThis.__calorieLoggerDb ?? createDb();
-globalThis.__calorieLoggerDb = db;
+function getDb(): DrizzleDb {
+  if (!globalThis.__calorieLoggerDb) {
+    globalThis.__calorieLoggerDb = createDb();
+  }
+  return globalThis.__calorieLoggerDb;
+}
+
+/**
+ * Live proxy so tests can swap the underlying SQLite file via
+ * `resetDbForTests` without rewriting every `import { db }` binding.
+ */
+export const db: DrizzleDb = new Proxy({} as DrizzleDb, {
+  get(_target, prop, receiver) {
+    const instance = getDb() as unknown as object;
+    const value = Reflect.get(instance, prop, receiver);
+    return typeof value === "function"
+      ? (value as (...args: unknown[]) => unknown).bind(instance)
+      : value;
+  },
+});
+
+/** Close any open connection and open a fresh DB at `dbFilePath` (tests only). */
+export function resetDbForTests(dbFilePath: string): DrizzleDb {
+  if (globalThis.__calorieLoggerSqlite) {
+    try {
+      globalThis.__calorieLoggerSqlite.close();
+    } catch {
+      // already closed
+    }
+  }
+  globalThis.__calorieLoggerSqlite = undefined;
+  globalThis.__calorieLoggerDb = undefined;
+  process.env.CALORIE_LOGGER_DB_PATH = dbFilePath;
+  const instance = createDb(dbFilePath);
+  globalThis.__calorieLoggerDb = instance;
+  return instance;
+}
+
+/** Drop entries and reset goals; keep seeded foods (tests only). */
+export function clearEntriesForTests(): void {
+  const sqlite = globalThis.__calorieLoggerSqlite;
+  if (!sqlite) return;
+  sqlite.exec("DELETE FROM entries");
+  sqlite
+    .prepare(
+      "UPDATE goals SET calories = 2000, protein = 120, carbs = 225, fat = 65 WHERE id = 1"
+    )
+    .run();
+}
