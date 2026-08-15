@@ -40,6 +40,9 @@ export function findFood(query: string): Food | undefined {
       const containment =
         overlap === queryTokens.size || overlap === candTokens.size;
       if (!containment) continue;
+      // require the overlap to cover at least half of the longer name, so
+      // "dragonfruit smoothie bowl" does not collapse into "smoothie"
+      if (overlap / Math.max(queryTokens.size, candTokens.size) < 0.5) continue;
       // prefer higher overlap, then smaller size difference
       const score =
         overlap * 10 - Math.abs(queryTokens.size - candTokens.size);
