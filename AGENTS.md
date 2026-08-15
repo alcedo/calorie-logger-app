@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Cursor Cloud specific instructions
+
+- Install: `npm ci`. Start: `npm run dev -- --hostname 0.0.0.0 --port 3000` (binds for laptop port-forwarding).
+- SQLite DB is created/seeded at `data/app.db` on first request. Optional secret `OPENAI_API_KEY` enables AI meal parsing; without it, only ~110 built-in foods resolve.
+- Smoke check: `POST /api/log` with `{"text":"2 eggs and 200g chicken breast"}`, then `GET /api/entries?date=YYYY-MM-DD`.
