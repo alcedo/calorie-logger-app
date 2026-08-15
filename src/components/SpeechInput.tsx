@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 /* Minimal Web Speech API typings (not in TS dom lib) */
 interface SpeechRecognitionResultLike {
@@ -36,16 +42,25 @@ function getSpeechRecognition(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+const noopSubscribe = () => () => {};
+
 export function useSpeechInput(onTranscript: (text: string) => void) {
-  const [supported, setSupported] = useState(false);
+  // false during SSR, real support check on the client
+  const supported = useSyncExternalStore(
+    noopSubscribe,
+    () => getSpeechRecognition() !== null,
+    () => false
+  );
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const onTranscriptRef = useRef(onTranscript);
-  onTranscriptRef.current = onTranscript;
 
   useEffect(() => {
-    setSupported(getSpeechRecognition() !== null);
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
+
+  useEffect(() => {
     return () => recognitionRef.current?.abort();
   }, []);
 

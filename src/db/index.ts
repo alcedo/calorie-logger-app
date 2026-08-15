@@ -57,7 +57,6 @@ CREATE TABLE IF NOT EXISTS goals (
 type DrizzleDb = BetterSQLite3Database<typeof schema>;
 
 declare global {
-  // eslint-disable-next-line no-var
   var __calorieLoggerDb: DrizzleDb | undefined;
 }
 

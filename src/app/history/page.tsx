@@ -29,16 +29,15 @@ export default function HistoryPage() {
   const [dayEntries, setDayEntries] = useState<Record<string, EntryDto[]>>({});
   const [loading, setLoading] = useState(true);
 
-  async function load() {
-    const [historyRes, goalsRes] = await Promise.all([
-      fetch("/api/history?days=60"),
-      fetch("/api/goals"),
-    ]);
-    const history = await historyRes.json();
-    const g = await goalsRes.json();
-    setDays(history.days);
-    setGoals(g.goals);
-    setLoading(false);
+  function load() {
+    return Promise.all([
+      fetch("/api/history?days=60").then((r) => r.json()),
+      fetch("/api/goals").then((r) => r.json()),
+    ]).then(([history, g]) => {
+      setDays(history.days);
+      setGoals(g.goals);
+      setLoading(false);
+    });
   }
 
   useEffect(() => {

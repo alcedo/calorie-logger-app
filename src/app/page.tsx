@@ -34,12 +34,14 @@ export default function TodayPage() {
   const [busy, setBusy] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
 
-  const refresh = useCallback(async () => {
-    const res = await fetch(`/api/entries?date=${todayLocalDate()}`);
-    const data = await res.json();
-    setEntries(data.entries);
-    setTotals(data.totals);
-    setGoals(data.goals);
+  const refresh = useCallback(() => {
+    return fetch(`/api/entries?date=${todayLocalDate()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setEntries(data.entries);
+        setTotals(data.totals);
+        setGoals(data.goals);
+      });
   }, []);
 
   useEffect(() => {
