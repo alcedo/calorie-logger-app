@@ -1,6 +1,6 @@
 ---
-name: mobile-preview
-description: Exposes the Macro calorie logger on a public HTTPS URL so it can be opened from a phone browser. Use proactively when the user wants to test on mobile, open the app on their phone, share a public preview link, or otherwise reach the running app from outside this machine. Handles install, server start, public tunnel, and off-VM verification with a retry loop until the URL works.
+name: expose-app-to-public-network
+description: Expose app to public network. Use proactively when the user wants a public HTTPS URL, to test on a phone browser, open the app from outside this machine, or share a preview link. Handles install, server start, public tunnel, and off-VM verification with a retry loop until the URL works.
 model: inherit
 ---
 
