@@ -125,6 +125,14 @@ describe("foods API", () => {
     expect(orphan?.foodId).toBeNull();
     expect(orphan?.foodName).toBe("Delete Me");
   });
+
+  it("DELETE returns 404 for missing food", async () => {
+    const { DELETE } = await import("@/app/api/foods/[id]/route");
+    const res = await DELETE(jsonRequest("DELETE", "/api/foods/999999"), {
+      params: Promise.resolve({ id: "999999" }),
+    });
+    expect(res.status).toBe(404);
+  });
 });
 
 describe("goals API", () => {
@@ -174,8 +182,20 @@ describe("history and status APIs", () => {
     expect(day?.entryCount).toBe(1);
     expect(day?.calories).toBe(72);
 
-    const clamped = await GET(jsonRequest("GET", "/api/history?days=9999"));
-    expect(clamped.status).toBe(200);
+    const high = await GET(jsonRequest("GET", "/api/history?days=9999"));
+    expect(high.status).toBe(200);
+
+    // days=0 clamps to 1 (still a successful response)
+    const low = await GET(jsonRequest("GET", "/api/history?days=0"));
+    expect(low.status).toBe(200);
+  });
+
+  it("returns empty days when nothing is in range", async () => {
+    const { GET } = await import("@/app/api/history/route");
+    const res = await GET(jsonRequest("GET", "/api/history?days=1"));
+    const { body } = await readJson<{ days: unknown[] }>(res);
+    // no entries in beforeEach-cleared DB
+    expect(body.days).toEqual([]);
   });
 
   it("status reflects AI availability", async () => {
@@ -237,5 +257,80 @@ describe("multi-step flows", () => {
     );
     const { body } = await readJson<{ goals: { calories: number } }>(res);
     expect(body.goals.calories).toBe(2200);
+  });
+
+  it("food CRUD affects lookup and orphans entries", async () => {
+    delete process.env.OPENAI_API_KEY;
+    const { POST: postFood } = await import("@/app/api/foods/route");
+    const created = await readJson<{ food: { id: number; name: string } }>(
+      await postFood(
+        jsonRequest("POST", "/api/foods", {
+          name: "Flow Snack",
+          calories: 100,
+          protein: 5,
+          carbs: 10,
+          fat: 4,
+        })
+      )
+    );
+    expect(created.status).toBe(201);
+
+    const { POST: postLog } = await import("@/app/api/log/route");
+    const logged = await readJson<{
+      logged: Array<{ id: number; foodId: number; calories: number }>;
+    }>(
+      await postLog(
+        jsonRequest("POST", "/api/log", {
+          text: "1 flow snack",
+          date: "2026-08-12",
+        })
+      )
+    );
+    expect(logged.body.logged).toHaveLength(1);
+    const entryId = logged.body.logged[0].id;
+
+    const { PATCH: patchFood, DELETE: deleteFood } = await import(
+      "@/app/api/foods/[id]/route"
+    );
+    await patchFood(
+      jsonRequest("PATCH", `/api/foods/${created.body.food.id}`, {
+        calories: 200,
+      }),
+      { params: Promise.resolve({ id: String(created.body.food.id) }) }
+    );
+
+    const { PATCH: patchEntry } = await import("@/app/api/entries/[id]/route");
+    const updated = await readJson<{ updated: { calories: number } }>(
+      await patchEntry(
+        jsonRequest("PATCH", `/api/entries/${entryId}`, { quantity: 1 }),
+        { params: Promise.resolve({ id: String(entryId) }) }
+      )
+    );
+    expect(updated.body.updated.calories).toBe(200);
+
+    await deleteFood(
+      jsonRequest("DELETE", `/api/foods/${created.body.food.id}`),
+      { params: Promise.resolve({ id: String(created.body.food.id) }) }
+    );
+    const orphan = db
+      .select()
+      .from(entries)
+      .where(eq(entries.id, entryId))
+      .get();
+    expect(orphan?.foodId).toBeNull();
+
+    const again = await readJson<{
+      logged: unknown[];
+      unresolved: Array<{ name: string }>;
+    }>(
+      await postLog(
+        jsonRequest("POST", "/api/log", {
+          text: "1 flow snack",
+          date: "2026-08-12",
+        })
+      )
+    );
+    expect(again.body.logged).toHaveLength(0);
+    expect(again.body.unresolved.length).toBeGreaterThanOrEqual(1);
   });
 });

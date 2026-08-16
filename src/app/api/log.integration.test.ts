@@ -146,6 +146,23 @@ describe("POST /api/log", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("falls back to UTC today when date is invalid", async () => {
+    const utcToday = new Date().toISOString().slice(0, 10);
+    const { POST } = await import("@/app/api/log/route");
+    await POST(
+      jsonRequest("POST", "/api/log", {
+        text: "1 egg",
+        date: "not-a-date",
+      })
+    );
+    const rows = db
+      .select()
+      .from(entries)
+      .where(eq(entries.date, utcToday))
+      .all();
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("puts unknown foods in unresolved when AI is off", async () => {
     const { POST } = await import("@/app/api/log/route");
     const res = await POST(
@@ -290,6 +307,22 @@ describe("POST /api/log with mocked AI", () => {
 });
 
 describe("GET /api/entries and entry mutations", () => {
+  it("defaults to UTC today when date is omitted", async () => {
+    const utcToday = new Date().toISOString().slice(0, 10);
+    const { POST } = await import("@/app/api/log/route");
+    await POST(
+      jsonRequest("POST", "/api/log", {
+        text: "1 egg",
+        date: utcToday,
+      })
+    );
+    const { GET } = await import("@/app/api/entries/route");
+    const res = await GET(jsonRequest("GET", "/api/entries"));
+    const { body } = await readJson<{ date: string; entries: unknown[] }>(res);
+    expect(body.date).toBe(utcToday);
+    expect(body.entries.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("returns entries, totals, and goals for a date", async () => {
     const { POST } = await import("@/app/api/log/route");
     await POST(
@@ -412,6 +445,15 @@ describe("GET /api/entries and entry mutations", () => {
       { params: Promise.resolve({ id: "1" }) }
     );
     expect(res.status).toBe(400);
+  });
+
+  it("PATCH returns 404 for missing entry", async () => {
+    const { PATCH } = await import("@/app/api/entries/[id]/route");
+    const res = await PATCH(
+      jsonRequest("PATCH", "/api/entries/999999", { quantity: 2 }),
+      { params: Promise.resolve({ id: "999999" }) }
+    );
+    expect(res.status).toBe(404);
   });
 
   it("DELETE removes an entry and 404s when missing", async () => {
