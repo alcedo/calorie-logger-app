@@ -1,6 +1,10 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  CODEX_LOGIN_STATUS_ARGS,
+  codexExecArgs,
+} from "../cli-args";
 import { codexBin, codexChildEnv } from "../env";
 import {
   CliError,
@@ -15,11 +19,6 @@ import type {
   ProviderAvailability,
 } from "../types";
 
-function modelArgs(): string[] {
-  const model = process.env.AI_CODEX_MODEL?.trim();
-  return model ? ["-m", model] : [];
-}
-
 export const codexProvider: AiProvider = {
   id: "codex",
   label: "Codex CLI (ChatGPT login)",
@@ -29,7 +28,7 @@ export const codexProvider: AiProvider = {
     try {
       const result = await runCli({
         command: codexBin(),
-        args: ["login", "status"],
+        args: [...CODEX_LOGIN_STATUS_ARGS],
         env,
         timeoutMs: PROBE_TIMEOUT_MS,
       });
@@ -73,21 +72,11 @@ export const codexProvider: AiProvider = {
       const prompt = `${req.system}\n\n${req.user}`;
       const result = await runCli({
         command: codexBin(),
-        args: [
-          "exec",
-          "-",
-          "--output-schema",
+        args: codexExecArgs({
           schemaPath,
-          "-o",
           outPath,
-          "--sandbox",
-          "read-only",
-          "--skip-git-repo-check",
-          "--ephemeral",
-          "--color",
-          "never",
-          ...modelArgs(),
-        ],
+          model: process.env.AI_CODEX_MODEL,
+        }),
         stdin: prompt,
         cwd,
         env,

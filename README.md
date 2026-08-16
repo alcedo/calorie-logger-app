@@ -73,12 +73,14 @@ Verify a signed-in setup with `npm run ai:doctor`. Unauthenticated CLI wiring ca
 ## Testing
 
 ```bash
-npm test          # Vitest unit + API/DB integration suite
+npm test          # Vitest unit + API/DB integration suite (includes AI contracts)
 npm run test:watch
 npm run test:e2e  # Playwright (Today / History / Foods flows)
 ```
 
-Unit tests cover parsing, normalization, unit conversion, and components. Integration tests use an isolated temp SQLite file (`CALORIE_LOGGER_DB_PATH` / `resetDbForTests`) so they never touch `data/app.db`. OpenAI is mocked; no network calls. Playwright boots `next dev` against a temp DB with AI disabled.
+Unit tests cover parsing, normalization, unit conversion, components, and Claude/Codex login contracts (OSC-8 URLs, env sanitization, never auto-selecting OpenAI). Integration tests use an isolated temp SQLite file (`CALORIE_LOGGER_DB_PATH` / `resetDbForTests`) so they never touch `data/app.db`. CLI login tests use fake binaries; they do not call Anthropic or OpenAI. Playwright boots `next dev` against a temp DB with AI disabled.
+
+After you connect a subscription, `npm run ai:doctor` runs a live meal parse. `npm run ai:cli-smoke` checks unauthenticated CLI flags (`--max-turns`, rejection of `--ask-for-approval`).
 
 ## Tech stack
 
@@ -98,3 +100,4 @@ Unit tests cover parsing, normalization, unit conversion, and components. Integr
 | `GET/PUT /api/goals` | Daily macro targets |
 | `GET /api/history?days=` | Per-day totals |
 | `GET /api/status` | Active AI provider and whether lookup is configured |
+| `POST /api/ai` | Connect / disconnect Claude or ChatGPT subscription login |

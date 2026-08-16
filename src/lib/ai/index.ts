@@ -9,6 +9,7 @@ import {
 } from "./schemas";
 import { hasStrayAnthropicKey } from "./env";
 import { activeLogins } from "./login";
+import { resolveAiStatusView } from "./select";
 import {
   getSetting,
   SETTING_AI_PROVIDER,
@@ -19,7 +20,6 @@ import type {
   AiProviderStatusDto,
   AiSelection,
   AiStatusDto,
-  BannerKind,
   ParsedFoodItem,
   ProviderAvailability,
   ProviderId,
@@ -47,6 +47,15 @@ export {
   parseClaudeLoginOutput,
   parseCodexDeviceAuthOutput,
 } from "./login-parse";
+export { AUTO_ORDER, resolveAiStatusView } from "./select";
+export {
+  CLAUDE_AUTH_LOGIN_ARGS,
+  CLAUDE_AUTH_STATUS_ARGS,
+  CODEX_DEVICE_LOGIN_ARGS,
+  claudePrintArgs,
+  codexExecArgs,
+} from "./cli-args";
+export { validateClaudeSetupToken } from "./setup-token";
 
 const PROVIDERS: Record<ProviderId, AiProvider> = {
   claude: claudeProvider,
@@ -54,14 +63,7 @@ const PROVIDERS: Record<ProviderId, AiProvider> = {
   openai: openaiProvider,
 };
 
-const AUTO_ORDER: ProviderId[] = ["claude", "codex"];
 const STATUS_TTL_MS = 30_000;
-
-const NONE_BANNER =
-  "AI is not configured. Connect Claude or ChatGPT on the AI page to look up unknown foods.";
-
-const API_KEY_BANNER =
-  "Claude Code would bill an API key instead of your subscription. Unset `ANTHROPIC_API_KEY` (and `ANTHROPIC_AUTH_TOKEN`), then connect Claude from the AI page.";
 
 let statusCache: { at: number; value: AiStatusDto } | null = null;
 
@@ -94,19 +96,6 @@ function toDto(
   };
 }
 
-function claudeLabel(avail: ProviderAvailability): string {
-  const plan = avail.subscriptionType;
-  if (plan) return `Claude Code (${plan} subscription)`;
-  if (avail.authMethod === "oauth_token") return "Claude Code (OAuth token)";
-  return "Claude Code (subscription)";
-}
-
-function labelFor(id: ProviderId, avail: ProviderAvailability): string {
-  if (id === "claude") return claudeLabel(avail);
-  if (id === "codex") return "Codex CLI (ChatGPT login)";
-  return "OpenAI API key";
-}
-
 async function probeAll(): Promise<Record<ProviderId, ProviderAvailability>> {
   const [claude, codex, openai] = await Promise.all([
     claudeProvider.isAvailable(),
@@ -127,69 +116,17 @@ export async function getAiStatus(): Promise<AiStatusDto> {
   const providers = (["claude", "codex", "openai"] as const).map((id) =>
     toDto(id, probed[id]),
   );
-
-  let activeId: ProviderId | null = null;
-  let bannerKind: BannerKind = "none";
-  let bannerMessage: string | null = NONE_BANNER;
-
-  if (selection === "invalid") {
-    bannerKind = "none";
-    bannerMessage = `Unknown AI_PROVIDER "${process.env.AI_PROVIDER}". Use auto, claude, codex, openai, or none.`;
-  } else if (selection === "none") {
-    bannerKind = "none";
-    bannerMessage = NONE_BANNER;
-  } else if (selection === "auto") {
-    for (const id of AUTO_ORDER) {
-      if (probed[id].available) {
-        activeId = id;
-        break;
-      }
-    }
-    if (activeId) {
-      bannerKind = "ok";
-      bannerMessage = null;
-    } else if (
-      probed.claude.reason === "api_key" ||
-      hasStrayAnthropicKey()
-    ) {
-      bannerKind = "api_key";
-      bannerMessage =
-        probed.claude.reason === "api_key"
-          ? probed.claude.detail
-          : API_KEY_BANNER;
-    } else {
-      bannerKind = "none";
-      bannerMessage = NONE_BANNER;
-    }
-  } else {
-    const avail = probed[selection];
-    if (avail.available) {
-      activeId = selection;
-      bannerKind = "ok";
-      bannerMessage = null;
-    } else {
-      bannerKind = avail.reason === "api_key" ? "api_key" : "none";
-      if (selection === "openai") {
-        bannerMessage =
-          "AI_PROVIDER is openai but OPENAI_API_KEY is not set.";
-      } else if (selection === "claude") {
-        bannerMessage = avail.detail;
-      } else {
-        bannerMessage = avail.detail;
-      }
-    }
-  }
+  const view = resolveAiStatusView({
+    selection,
+    probed,
+    strayAnthropicKey: hasStrayAnthropicKey(),
+    invalidProviderRaw: process.env.AI_PROVIDER,
+  });
 
   const value: AiStatusDto = {
-    aiAvailable: activeId !== null,
-    provider: activeId,
-    providerLabel: activeId
-      ? labelFor(activeId, probed[activeId])
-      : null,
+    ...view,
     selection,
     providers,
-    bannerKind,
-    bannerMessage,
     logins: activeLogins(),
   };
   statusCache = { at: now, value };

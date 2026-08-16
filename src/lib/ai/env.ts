@@ -76,9 +76,13 @@ export function claudeChildEnv(): NodeJS.ProcessEnv {
   sanitizeHostEnv(env);
   delete env.ANTHROPIC_API_KEY;
   delete env.ANTHROPIC_AUTH_TOKEN;
-  const token =
-    process.env.CLAUDE_CODE_OAUTH_TOKEN ||
-    getSetting(SETTING_CLAUDE_OAUTH_TOKEN);
+  let stored: string | undefined;
+  try {
+    stored = getSetting(SETTING_CLAUDE_OAUTH_TOKEN);
+  } catch {
+    stored = undefined;
+  }
+  const token = process.env.CLAUDE_CODE_OAUTH_TOKEN || stored;
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
   if (token) env.CLAUDE_CODE_OAUTH_TOKEN = token;
   return env;

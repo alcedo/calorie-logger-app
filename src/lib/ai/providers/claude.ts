@@ -2,6 +2,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { interpretClaudeAuthStatus, interpretClaudePrintResult } from "../claude-parse";
+import {
+  CLAUDE_AUTH_STATUS_ARGS,
+  claudePrintArgs,
+} from "../cli-args";
 import { claudeBin, claudeChildEnv } from "../env";
 import {
   CliError,
@@ -15,11 +19,6 @@ import type {
   ProviderAvailability,
 } from "../types";
 
-function modelArgs(): string[] {
-  const model = process.env.AI_CLAUDE_MODEL?.trim();
-  return model ? ["--model", model] : [];
-}
-
 export const claudeProvider: AiProvider = {
   id: "claude",
   label: "Claude Code (subscription)",
@@ -29,7 +28,7 @@ export const claudeProvider: AiProvider = {
     try {
       const result = await runCli({
         command: claudeBin(),
-        args: ["auth", "status"],
+        args: [...CLAUDE_AUTH_STATUS_ARGS],
         env,
         timeoutMs: PROBE_TIMEOUT_MS,
       });
@@ -74,22 +73,11 @@ export const claudeProvider: AiProvider = {
     try {
       const result = await runCli({
         command: claudeBin(),
-        args: [
-          "-p",
-          "--output-format",
-          "json",
-          "--json-schema",
-          JSON.stringify(req.schema),
-          "--system-prompt",
-          req.system,
-          "--tools",
-          "",
-          "--strict-mcp-config",
-          "--max-turns",
-          "2", // valid but hidden from `claude --help`; needed for schema retries
-          "--no-session-persistence",
-          ...modelArgs(),
-        ],
+        args: claudePrintArgs({
+          schemaJson: JSON.stringify(req.schema),
+          system: req.system,
+          model: process.env.AI_CLAUDE_MODEL,
+        }),
         stdin: req.user,
         cwd,
         env,

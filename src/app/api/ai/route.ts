@@ -9,6 +9,7 @@ import {
   startCodexLogin,
   type LoginKind,
 } from "@/lib/ai/login";
+import { validateClaudeSetupToken } from "@/lib/ai/setup-token";
 import {
   deleteSetting,
   setSetting,
@@ -71,22 +72,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ status: await getAiStatus() });
       }
       case "token": {
-        const token = String(body?.token ?? "").trim();
-        if (!token) {
-          return NextResponse.json({ error: "Paste a Claude setup-token" }, { status: 400 });
+        const parsed = validateClaudeSetupToken(String(body?.token ?? ""));
+        if (!parsed.ok) {
+          return NextResponse.json({ error: parsed.error }, { status: 400 });
         }
-        if (token.startsWith("sk-ant-api") || token.startsWith("sk-")) {
-          if (!token.startsWith("sk-ant-oat")) {
-            return NextResponse.json(
-              {
-                error:
-                  "That looks like an API key. This app only accepts a Claude subscription token from `claude setup-token`.",
-              },
-              { status: 400 },
-            );
-          }
-        }
-        setSetting(SETTING_CLAUDE_OAUTH_TOKEN, token);
+        setSetting(SETTING_CLAUDE_OAUTH_TOKEN, parsed.token);
         clearAiStatusCache();
         return NextResponse.json({ status: await getAiStatus() });
       }

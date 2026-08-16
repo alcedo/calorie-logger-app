@@ -1,6 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { claudeBin, claudeChildEnv, codexBin, codexChildEnv } from "./env";
+import {
+  CLAUDE_AUTH_LOGIN_ARGS,
+  CLAUDE_AUTH_LOGOUT_ARGS,
+  CODEX_DEVICE_LOGIN_ARGS,
+  CODEX_LOGOUT_ARGS,
+} from "./cli-args";
 import { parseClaudeLoginOutput, parseCodexDeviceAuthOutput } from "./login-parse";
 
 export type LoginKind = "claude" | "codex";
@@ -24,7 +30,15 @@ interface LoginSession {
 
 const CLAUDE_TTL_MS = 10 * 60 * 1000;
 const CODEX_TTL_MS = 15 * 60 * 1000;
-const START_WAIT_MS = 20_000;
+const DEFAULT_START_WAIT_MS = 20_000;
+
+function startWaitMs(): number {
+  const raw = process.env.AI_LOGIN_START_WAIT_MS;
+  if (!raw) return DEFAULT_START_WAIT_MS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 250) return DEFAULT_START_WAIT_MS;
+  return Math.min(Math.floor(n), 60_000);
+}
 
 type Store = Map<string, LoginSession>;
 
@@ -161,7 +175,7 @@ async function spawnUntilParsed(
   const child = spawnLogin(command, args, env);
   const { sessionBuf, closed } = attach(child);
   try {
-    await waitFor(sessionBuf, child, parse, START_WAIT_MS);
+    await waitFor(sessionBuf, child, parse, startWaitMs());
   } catch (err) {
     killChild(child);
     throw err;
@@ -173,7 +187,7 @@ export async function startClaudeLogin(): Promise<LoginSessionPublic> {
   cancelProvider("claude");
   const { child, sessionBuf, closed } = await spawnUntilParsed(
     claudeBin(),
-    ["auth", "login", "--claudeai"],
+    [...CLAUDE_AUTH_LOGIN_ARGS],
     claudeChildEnv(),
     parseClaudeLoginOutput,
   );
@@ -264,7 +278,7 @@ export async function startCodexLogin(): Promise<LoginSessionPublic> {
   cancelProvider("codex");
   const { child, sessionBuf, closed } = await spawnUntilParsed(
     codexBin(),
-    ["login", "--device-auth"],
+    [...CODEX_DEVICE_LOGIN_ARGS],
     codexChildEnv(),
     parseCodexDeviceAuthOutput,
   );
@@ -341,14 +355,14 @@ export async function logoutProvider(provider: LoginKind): Promise<void> {
   if (provider === "claude") {
     await runCli({
       command: claudeBin(),
-      args: ["auth", "logout"],
+      args: [...CLAUDE_AUTH_LOGOUT_ARGS],
       env: claudeChildEnv(),
       timeoutMs: PROBE_TIMEOUT_MS,
     }).catch(() => undefined);
   } else {
     await runCli({
       command: codexBin(),
-      args: ["logout"],
+      args: [...CODEX_LOGOUT_ARGS],
       env: codexChildEnv(),
       timeoutMs: PROBE_TIMEOUT_MS,
     }).catch(() => undefined);
