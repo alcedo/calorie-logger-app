@@ -199,15 +199,32 @@ describe("history and status APIs", () => {
   });
 
   it("status reflects AI availability", async () => {
+    const originalKey = process.env.OPENAI_API_KEY;
+    const originalProvider = process.env.AI_PROVIDER;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.AI_PROVIDER;
+    const { clearAiStatusCache } = await import("@/lib/ai");
+    clearAiStatusCache();
+
     const { GET } = await import("@/app/api/status/route");
     const off = await readJson<{ aiAvailable: boolean }>(await GET());
     expect(off.body.aiAvailable).toBe(false);
 
     process.env.OPENAI_API_KEY = "x";
+    clearAiStatusCache();
+    const keyOnly = await readJson<{ aiAvailable: boolean }>(await GET());
+    expect(keyOnly.body.aiAvailable).toBe(false);
+
+    process.env.AI_PROVIDER = "openai";
+    clearAiStatusCache();
     const on = await readJson<{ aiAvailable: boolean }>(await GET());
     expect(on.body.aiAvailable).toBe(true);
-    delete process.env.OPENAI_API_KEY;
+
+    if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalKey;
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER;
+    else process.env.AI_PROVIDER = originalProvider;
+    clearAiStatusCache();
   });
 });
 

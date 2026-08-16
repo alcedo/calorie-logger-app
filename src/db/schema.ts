@@ -61,6 +61,11 @@ export const goals = sqliteTable("goals", {
   fat: real("fat").notNull().default(65),
 });
 
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
 export type Food = typeof foods.$inferSelect;
 export type NewFood = typeof foods.$inferInsert;
 export type Entry = typeof entries.$inferSelect;

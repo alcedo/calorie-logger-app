@@ -11,5 +11,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Cursor Cloud specific instructions
 
 - Install: `npm ci`. Start: `npm run dev -- --hostname 0.0.0.0 --port 3000` (binds for laptop port-forwarding).
-- SQLite DB is created/seeded at `data/app.db` on first request. Optional secret `OPENAI_API_KEY` enables AI meal parsing; without it, only ~110 built-in foods resolve.
+- SQLite DB is created/seeded at `data/app.db` on first request. Sign in with `claude auth login` (preferred) or `codex login` for AI meal parsing. `OPENAI_API_KEY` is a paid opt-in (`AI_PROVIDER=openai`) and is never auto-selected. Without a signed-in CLI, only ~110 built-in foods resolve.
 - Smoke check: `POST /api/log` with `{"text":"2 eggs and 200g chicken breast"}`, then `GET /api/entries?date=YYYY-MM-DD`.
+- Contract tests for Claude/Codex login (no live subscription required): `npm test`. Live signed-in probe: `npm run ai:doctor`.

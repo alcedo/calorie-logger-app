@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "ai:doctor": "tsx scripts/ai-doctor.ts",
+    "ai:cli-smoke": "tsx scripts/ai-cli-smoke.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

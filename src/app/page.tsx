@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { MacroDashboard } from "@/components/MacroDashboard";
 import { EntryList } from "@/components/EntryList";
@@ -10,6 +11,7 @@ import {
   type GoalsDto,
   type MacroTotalsDto,
 } from "@/lib/types";
+import type { AiStatusDto } from "@/lib/ai/types";
 
 interface ChatMessage {
   id: number;
@@ -32,7 +34,7 @@ export default function TodayPage() {
   const [goals, setGoals] = useState<GoalsDto | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
-  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiStatus, setAiStatus] = useState<AiStatusDto | null>(null);
 
   const refresh = useCallback(() => {
     return fetch(`/api/entries?date=${todayLocalDate()}`)
@@ -48,8 +50,8 @@ export default function TodayPage() {
     refresh();
     fetch("/api/status")
       .then((r) => r.json())
-      .then((d) => setAiAvailable(d.aiAvailable))
-      .catch(() => setAiAvailable(null));
+      .then((d: AiStatusDto) => setAiStatus(d))
+      .catch(() => setAiStatus(null));
   }, [refresh]);
 
   function pushMessage(msg: Omit<ChatMessage, "id">) {
@@ -110,12 +112,32 @@ export default function TodayPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      {aiAvailable === false && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
-          AI is not configured (missing <code>OPENAI_API_KEY</code>). Known
-          foods still log fine; unknown foods can&apos;t be looked up until a
-          key is set.
-        </div>
+      {aiStatus?.bannerKind === "api_key" && (
+        <Link
+          href="/ai"
+          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200"
+        >
+          {aiStatus.bannerMessage ??
+            "Claude would bill an API key. Open AI settings to connect your subscription."}{" "}
+          <span className="underline">Open AI settings</span>
+        </Link>
+      )}
+
+      {aiStatus?.bannerKind === "none" && (
+        <Link
+          href="/ai"
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300"
+        >
+          {aiStatus.bannerMessage ??
+            "AI is not configured. Connect Claude or ChatGPT to look up unknown foods."}{" "}
+          <span className="underline">Connect AI</span>
+        </Link>
+      )}
+
+      {aiStatus?.bannerKind === "ok" && aiStatus.providerLabel && (
+        <p className="text-[11px] text-zinc-500">
+          AI: {aiStatus.providerLabel}
+        </p>
       )}
 
       {totals && goals && <MacroDashboard totals={totals} goals={goals} />}
