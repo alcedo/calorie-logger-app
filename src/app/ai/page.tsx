@@ -241,7 +241,7 @@ export default function AiPage() {
               <button
                 onClick={complete}
                 disabled={busy === "complete" || !code.trim()}
-                className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+                className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:opacity-100"
               >
                 {busy === "complete" ? "Connecting…" : "Confirm code"}
               </button>
@@ -260,7 +260,7 @@ export default function AiPage() {
               onClick={() => connect("claude")}
               disabled={busy === "claude" || claudeConnectBlocked}
               title={claudeCliMissing ? claude?.detail : undefined}
-              className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+              className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:opacity-100"
             >
               {busy === "claude" ? "Starting…" : claudeOn ? "Reconnect Claude" : "Connect Claude"}
             </button>
@@ -364,7 +364,7 @@ export default function AiPage() {
               onClick={() => connect("codex")}
               disabled={busy === "codex" || codexConnectBlocked}
               title={codexCliMissing ? codex?.detail : undefined}
-              className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+              className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:opacity-100"
             >
               {busy === "codex" ? "Starting…" : codexOn ? "Reconnect ChatGPT" : "Connect ChatGPT"}
             </button>
