@@ -5,25 +5,23 @@ import { useCallback, useEffect, useState } from "react";
 import { MacroDashboard } from "@/components/MacroDashboard";
 import { EntryList } from "@/components/EntryList";
 import { LogComposer } from "@/components/LogComposer";
+import { ThoughtProcess } from "@/components/ThoughtProcess";
+import { AiPicker } from "@/components/AiPicker";
 import {
   todayLocalDate,
   type EntryDto,
   type GoalsDto,
   type MacroTotalsDto,
 } from "@/lib/types";
-import type { AiStatusDto } from "@/lib/ai/types";
+import type { AiStatusDto, ProviderId } from "@/lib/ai/types";
+import { logMealFromClient } from "@/lib/log-client";
+import type { LogTraceEvent } from "@/lib/log-trace";
 
 interface ChatMessage {
   id: number;
   role: "user" | "app";
   text: string;
   tone?: "ok" | "warn" | "error";
-}
-
-interface LogResponse {
-  logged?: EntryDto[];
-  unresolved?: { name: string; reason: string }[];
-  error?: string;
 }
 
 let nextMsgId = 1;
@@ -35,6 +33,7 @@ export default function TodayPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState<AiStatusDto | null>(null);
+  const [trace, setTrace] = useState<LogTraceEvent[]>([]);
 
   const refresh = useCallback(() => {
     return fetch(`/api/entries?date=${todayLocalDate()}`)
@@ -46,44 +45,59 @@ export default function TodayPage() {
       });
   }, []);
 
-  useEffect(() => {
-    refresh();
-    fetch("/api/status")
+  const refreshStatus = useCallback(() => {
+    return fetch("/api/status")
       .then((r) => r.json())
       .then((d: AiStatusDto) => setAiStatus(d))
       .catch(() => setAiStatus(null));
-  }, [refresh]);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    refreshStatus();
+  }, [refresh, refreshStatus]);
 
   function pushMessage(msg: Omit<ChatMessage, "id">) {
     setMessages((prev) => [...prev.slice(-5), { ...msg, id: nextMsgId++ }]);
   }
 
+  async function saveAiPreference(patch: {
+    selection?: string;
+    models?: Partial<Record<ProviderId, string>>;
+  }) {
+    const res = await fetch("/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "preference", ...patch }),
+    });
+    const data = (await res.json()) as { status?: AiStatusDto };
+    if (data.status) setAiStatus(data.status);
+  }
+
   async function handleSubmit(text: string) {
     setBusy(true);
+    setTrace([]);
     pushMessage({ role: "user", text });
     try {
-      const res = await fetch("/api/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, date: todayLocalDate() }),
+      const data = await logMealFromClient(text, todayLocalDate(), (event) => {
+        setTrace((prev) => [...prev, event]);
       });
-      const data: LogResponse = await res.json();
 
-      if (!res.ok) {
+      if (data.error && data.logged.length === 0 && data.unresolved.length === 0) {
         pushMessage({
           role: "app",
-          text: data.error ?? "Something went wrong.",
+          text: data.error,
           tone: "error",
         });
         return;
       }
 
-      if (data.logged && data.logged.length > 0) {
+      if (data.logged.length > 0) {
         const parts = data.logged.map(
           (e) =>
             `${e.quantity} ${e.unit} ${e.foodName} — ${Math.round(
-              e.calories
-            )} kcal, ${e.protein}g protein`
+              e.calories,
+            )} kcal, ${e.protein}g protein`,
         );
         pushMessage({
           role: "app",
@@ -91,7 +105,7 @@ export default function TodayPage() {
           tone: "ok",
         });
       }
-      for (const u of data.unresolved ?? []) {
+      for (const u of data.unresolved) {
         pushMessage({
           role: "app",
           text: `Couldn't log "${u.name}": ${u.reason}`,
@@ -134,10 +148,16 @@ export default function TodayPage() {
         </Link>
       )}
 
-      {aiStatus?.bannerKind === "ok" && aiStatus.providerLabel && (
-        <p className="text-[11px] text-zinc-500">
-          AI: {aiStatus.providerLabel}
-        </p>
+      {aiStatus && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <AiPicker status={aiStatus} onChange={saveAiPreference} compact />
+          {aiStatus.bannerKind === "ok" && aiStatus.providerLabel && (
+            <p className="text-[11px] text-zinc-500">
+              AI: {aiStatus.providerLabel}
+              {aiStatus.activeModelLabel ? ` · ${aiStatus.activeModelLabel}` : ""}
+            </p>
+          )}
+        </div>
       )}
 
       {totals && goals && <MacroDashboard totals={totals} goals={goals} />}
@@ -150,6 +170,11 @@ export default function TodayPage() {
       </section>
 
       <div className="sticky bottom-0 -mx-4 border-t border-zinc-800 bg-zinc-950/95 px-4 pb-4 pt-3 backdrop-blur">
+        {(trace.length > 0 || busy) && (
+          <div className="mb-3">
+            <ThoughtProcess events={trace} busy={busy} />
+          </div>
+        )}
         {messages.length > 0 && (
           <div className="mb-3 flex flex-col gap-1.5">
             {messages.map((m) => (

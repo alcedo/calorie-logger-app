@@ -207,8 +207,17 @@ describe("history and status APIs", () => {
     clearAiStatusCache();
 
     const { GET } = await import("@/app/api/status/route");
-    const off = await readJson<{ aiAvailable: boolean }>(await GET());
+    const off = await readJson<{
+      aiAvailable: boolean;
+      providers: Array<{ id: string; cliInstalled?: boolean }>;
+    }>(await GET());
     expect(off.body.aiAvailable).toBe(false);
+    expect(off.body.providers.find((p) => p.id === "claude")?.cliInstalled).toBe(
+      false,
+    );
+    expect(off.body.providers.find((p) => p.id === "codex")?.cliInstalled).toBe(
+      false,
+    );
 
     process.env.OPENAI_API_KEY = "x";
     clearAiStatusCache();
@@ -225,6 +234,69 @@ describe("history and status APIs", () => {
     if (originalProvider === undefined) delete process.env.AI_PROVIDER;
     else process.env.AI_PROVIDER = originalProvider;
     clearAiStatusCache();
+  });
+
+  it("saves provider and model preference", async () => {
+    const originalProvider = process.env.AI_PROVIDER;
+    delete process.env.AI_PROVIDER;
+    const { clearAiStatusCache } = await import("@/lib/ai");
+    const { POST } = await import("@/app/api/ai/route");
+    const res = await POST(
+      jsonRequest("POST", "/api/ai", {
+        action: "preference",
+        selection: "none",
+        models: { claude: "haiku" },
+      }),
+    );
+    const { status, body } = await readJson<{
+      status: { selection: string; models: { claude: string } };
+    }>(res);
+    expect(status).toBe(200);
+    expect(body.status.selection).toBe("none");
+    expect(body.status.models.claude).toBe("haiku");
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER;
+    else process.env.AI_PROVIDER = originalProvider;
+    clearAiStatusCache();
+  });
+
+  it("connect Codex without a CLI returns a readable error, not spawn ENOENT", async () => {
+    const originalBin = process.env.AI_CODEX_BIN;
+    const originalWait = process.env.AI_LOGIN_START_WAIT_MS;
+    process.env.AI_CODEX_BIN = "/no/such/macro-codex-binary";
+    process.env.AI_LOGIN_START_WAIT_MS = "2000";
+    const { POST } = await import("@/app/api/ai/route");
+    const res = await POST(
+      jsonRequest("POST", "/api/ai", { action: "connect", provider: "codex" }),
+    );
+    const { status, body } = await readJson<{ error: string }>(res);
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/codex CLI not found/i);
+    expect(body.error).not.toMatch(/spawn /i);
+    expect(body.error).not.toMatch(/ENOENT/);
+    if (originalBin === undefined) delete process.env.AI_CODEX_BIN;
+    else process.env.AI_CODEX_BIN = originalBin;
+    if (originalWait === undefined) delete process.env.AI_LOGIN_START_WAIT_MS;
+    else process.env.AI_LOGIN_START_WAIT_MS = originalWait;
+  });
+
+  it("connect Claude without a CLI returns a readable error, not spawn ENOENT", async () => {
+    const originalBin = process.env.AI_CLAUDE_BIN;
+    const originalWait = process.env.AI_LOGIN_START_WAIT_MS;
+    process.env.AI_CLAUDE_BIN = "/no/such/macro-claude-binary";
+    process.env.AI_LOGIN_START_WAIT_MS = "2000";
+    const { POST } = await import("@/app/api/ai/route");
+    const res = await POST(
+      jsonRequest("POST", "/api/ai", { action: "connect", provider: "claude" }),
+    );
+    const { status, body } = await readJson<{ error: string }>(res);
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/claude CLI not found/i);
+    expect(body.error).not.toMatch(/spawn /i);
+    expect(body.error).not.toMatch(/ENOENT/);
+    if (originalBin === undefined) delete process.env.AI_CLAUDE_BIN;
+    else process.env.AI_CLAUDE_BIN = originalBin;
+    if (originalWait === undefined) delete process.env.AI_LOGIN_START_WAIT_MS;
+    else process.env.AI_LOGIN_START_WAIT_MS = originalWait;
   });
 });
 

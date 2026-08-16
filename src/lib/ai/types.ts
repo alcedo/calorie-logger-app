@@ -35,6 +35,12 @@ export interface ProviderAvailability {
   reason?: ProviderReason;
   subscriptionType?: string | null;
   authMethod?: string;
+  /**
+   * CLI subscription providers only. False when the binary is not on PATH
+   * (Connect must not spawn). True when the CLI ran, even if the user is
+   * logged out. Omit for OpenAI (no CLI).
+   */
+  cliInstalled?: boolean;
 }
 
 export interface GenerateJsonRequest {
@@ -42,6 +48,13 @@ export interface GenerateJsonRequest {
   user: string;
   schemaName: string;
   schema: Record<string, unknown>;
+  /** Provider-specific model id. Omit to use the CLI/SDK default. */
+  model?: string;
+}
+
+export interface ModelOptionDto {
+  id: string;
+  label: string;
 }
 
 export interface AiProvider {
@@ -72,6 +85,7 @@ export interface AiProviderStatusDto {
   reason?: ProviderReason;
   subscriptionType?: string | null;
   authMethod?: string;
+  cliInstalled?: boolean;
 }
 
 export interface AiStatusDto {
@@ -83,4 +97,8 @@ export interface AiStatusDto {
   bannerKind: BannerKind;
   bannerMessage: string | null;
   logins: AiLoginSessionDto[];
+  models: Record<ProviderId, string>;
+  modelCatalog: Record<ProviderId, ModelOptionDto[]>;
+  activeModel: string | null;
+  activeModelLabel: string | null;
 }

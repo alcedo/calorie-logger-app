@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { AiLoginSessionDto, AiStatusDto } from "@/lib/ai/types";
+import { AiPicker } from "@/components/AiPicker";
+import type { AiLoginSessionDto, AiStatusDto, ProviderId } from "@/lib/ai/types";
 
 type ProviderCard = "claude" | "codex";
 
@@ -140,8 +141,11 @@ export default function AiPage() {
     }
   }
 
-  async function setPreference(selection: string) {
-    const data = await postAi({ action: "preference", selection });
+  async function setPreference(patch: {
+    selection?: string;
+    models?: Partial<Record<ProviderId, string>>;
+  }) {
+    const data = await postAi({ action: "preference", ...patch });
     if (data.status) setStatus(data.status);
   }
 
@@ -149,6 +153,11 @@ export default function AiPage() {
   const codex = providerState(status, "codex");
   const claudeOn = Boolean(claude?.available);
   const codexOn = Boolean(codex?.available);
+  const claudeCliMissing = claude?.cliInstalled === false;
+  const codexCliMissing = codex?.cliInstalled === false;
+  const claudeConnectBlocked = !status || claudeCliMissing;
+  const codexConnectBlocked = !status || codexCliMissing;
+  const anyCliMissing = claudeCliMissing || codexCliMissing;
 
   return (
     <div className="flex flex-1 flex-col gap-5">
@@ -156,8 +165,16 @@ export default function AiPage() {
         <h1 className="text-lg font-semibold text-zinc-100">AI connections</h1>
         <p className="mt-1 text-sm text-zinc-400">
           Link the Claude or ChatGPT subscription you already pay for. No API
-          keys. Unknown foods then look up automatically when you log a meal.
+          keys. Unknown foods then look up automatically — the model searches
+          USDA, Open Food Facts, and the web, and you can watch its thought
+          process while logging.
         </p>
+        {anyCliMissing && (
+          <p className="mt-2 text-sm text-amber-300/90">
+            Connect runs on this app&apos;s server, not on your phone. Install
+            the CLI on that computer, then refresh this page.
+          </p>
+        )}
       </header>
 
       {status?.bannerKind === "ok" && status.providerLabel && (
@@ -179,6 +196,9 @@ export default function AiPage() {
             <p className="mt-1 text-xs text-zinc-500">
               Pro / Max / Team subscription via Claude Code
             </p>
+            {!claudeOn && claude?.detail && (
+              <p className="mt-2 text-xs text-amber-400/90">{claude.detail}</p>
+            )}
           </div>
           <StatusPill
             ok={claudeOn}
@@ -187,7 +207,9 @@ export default function AiPage() {
                 ? claude?.subscriptionType
                   ? claude.subscriptionType
                   : "Connected"
-                : "Not connected"
+                : claudeCliMissing
+                  ? "CLI not installed"
+                  : "Not connected"
             }
           />
         </div>
@@ -219,7 +241,7 @@ export default function AiPage() {
               <button
                 onClick={complete}
                 disabled={busy === "complete" || !code.trim()}
-                className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+                className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:opacity-100"
               >
                 {busy === "complete" ? "Connecting…" : "Confirm code"}
               </button>
@@ -234,9 +256,11 @@ export default function AiPage() {
         ) : (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={() => connect("claude")}
-              disabled={busy === "claude"}
-              className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+              disabled={busy === "claude" || claudeConnectBlocked}
+              title={claudeCliMissing ? claude?.detail : undefined}
+              className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:opacity-100"
             >
               {busy === "claude" ? "Starting…" : claudeOn ? "Reconnect Claude" : "Connect Claude"}
             </button>
@@ -289,8 +313,20 @@ export default function AiPage() {
             <p className="mt-1 text-xs text-zinc-500">
               ChatGPT Plus / Pro subscription via Codex login — not an API key
             </p>
+            {!codexOn && codex?.detail && (
+              <p className="mt-2 text-xs text-amber-400/90">{codex.detail}</p>
+            )}
           </div>
-          <StatusPill ok={codexOn} label={codexOn ? "Connected" : "Not connected"} />
+          <StatusPill
+            ok={codexOn}
+            label={
+              codexOn
+                ? "Connected"
+                : codexCliMissing
+                  ? "CLI not installed"
+                  : "Not connected"
+            }
+          />
         </div>
 
         {login?.provider === "codex" ? (
@@ -324,9 +360,11 @@ export default function AiPage() {
         ) : (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={() => connect("codex")}
-              disabled={busy === "codex"}
-              className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+              disabled={busy === "codex" || codexConnectBlocked}
+              title={codexCliMissing ? codex?.detail : undefined}
+              className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:opacity-100"
             >
               {busy === "codex" ? "Starting…" : codexOn ? "Reconnect ChatGPT" : "Connect ChatGPT"}
             </button>
@@ -343,25 +381,14 @@ export default function AiPage() {
       </section>
 
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
-        <h2 className="text-sm font-semibold text-zinc-200">Which one to use</h2>
-        <div className="mt-3 flex flex-col gap-2 text-sm text-zinc-300">
-          {(
-            [
-              ["auto", "Auto — Claude if connected, otherwise ChatGPT"],
-              ["claude", "Always Claude"],
-              ["codex", "Always ChatGPT (Codex)"],
-            ] as const
-          ).map(([value, label]) => (
-            <label key={value} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="pref"
-                checked={(status?.selection ?? "auto") === value}
-                onChange={() => setPreference(value)}
-              />
-              {label}
-            </label>
-          ))}
+        <h2 className="text-sm font-semibold text-zinc-200">Provider and model</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Choose which connected subscription (or paid OpenAI key) to use, and
+          which model it should call. Auto picks Claude if it is signed in,
+          otherwise ChatGPT.
+        </p>
+        <div className="mt-4">
+          <AiPicker status={status} onChange={setPreference} showAllModels />
         </div>
       </section>
     </div>
@@ -375,7 +402,7 @@ function StatusPill({ ok, label }: { ok: boolean; label?: string }) {
         ok ? "bg-emerald-500/15 text-emerald-300" : "bg-zinc-800 text-zinc-500"
       }`}
     >
-      {ok ? label || "Connected" : "Not connected"}
+      {label ?? (ok ? "Connected" : "Not connected")}
     </span>
   );
 }

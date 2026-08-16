@@ -9,6 +9,7 @@ vi.mock("@/lib/ai/providers/claude", () => ({
       available: false,
       detail: "Claude CLI is not installed on this host.",
       reason: "missing",
+      cliInstalled: false,
     }),
     generateJson: async () => {
       throw new Error("Claude provider is mocked in tests");
@@ -24,6 +25,7 @@ vi.mock("@/lib/ai/providers/codex", () => ({
       available: false,
       detail: "Codex CLI is not installed on this host.",
       reason: "missing",
+      cliInstalled: false,
     }),
     generateJson: async () => {
       throw new Error("Codex provider is mocked in tests");

@@ -19,6 +19,26 @@ test("Today: AI-off banner and log meal updates dashboard", async ({
   await expect(page.getByText("Chicken Breast").first()).toBeVisible();
   // dashboard shows summed calories (144 + 330 = 474)
   await expect(page.getByText("474").first()).toBeVisible();
+  await expect(page.getByText("Thought process")).toBeVisible();
+  await expect(page.getByText(/built-in parser/i).first()).toBeVisible();
+  await expect(page.getByLabel("AI provider")).toBeVisible();
+});
+
+test("AI page: provider and model pickers", async ({ page }) => {
+  await page.goto("/ai");
+  await expect(page.getByRole("heading", { name: "AI connections" })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByRole("heading", { name: /Provider and model/i })).toBeVisible();
+  await expect(page.getByLabel("AI provider")).toBeVisible();
+  await expect(page.getByLabel("claude model")).toBeVisible();
+  await expect(page.getByLabel("codex model")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect Claude" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Connect ChatGPT" })).toBeDisabled();
+  await expect(page.getByText("CLI not installed").first()).toBeVisible();
+  await expect(
+    page.getByText(/Install the CLI on that computer/i),
+  ).toBeVisible();
 });
 
 test("History: expand day loads entries", async ({ page }) => {

@@ -1,4 +1,6 @@
+import { accessSync, constants, statSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 
 export const DEFAULT_CLI_TIMEOUT_MS = 60_000;
 export const MIN_CLI_TIMEOUT_MS = 20_000;
@@ -19,6 +21,101 @@ export class CliError extends Error {
     super(message);
     this.name = "CliError";
   }
+}
+
+export function isCliNotFound(err: unknown): boolean {
+  if (err == null) return false;
+  if (typeof err === "object") {
+    const e = err as { code?: string; message?: string };
+    if (e.code === "ENOENT") return true;
+    if (typeof e.message === "string" && /ENOENT/i.test(e.message)) return true;
+  }
+  return /ENOENT/i.test(String(err));
+}
+
+export function cliNotFoundMessage(command: string): string {
+  const base = command.split(/[/\\]/).pop() || command;
+  if (/codex/i.test(base) || /codex/i.test(command)) {
+    return "codex CLI not found on PATH. Install Codex on the computer running this app, then connect ChatGPT again.";
+  }
+  if (/claude/i.test(base) || /claude/i.test(command)) {
+    return "claude CLI not found on PATH. Install Claude Code on the computer running this app, then connect Claude again.";
+  }
+  return `${base} not found on PATH.`;
+}
+
+function isExecutableFile(filePath: string): boolean {
+  try {
+    if (!statSync(filePath).isFile()) return false;
+    accessSync(filePath, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+type PathEnv = {
+  PATH?: string;
+  [key: string]: string | undefined;
+};
+
+/**
+ * Resolve a CLI the same way POSIX `spawn(command, { env, cwd })` does:
+ * paths with a separator are used as-is (relative to cwd); bare names search PATH.
+ */
+export function resolveExecutable(
+  command: string,
+  env: PathEnv = process.env,
+  cwd?: string,
+): string | null {
+  const trimmed = command.trim();
+  if (!trimmed) return null;
+
+  const hasSep = trimmed.includes("/") || trimmed.includes("\\");
+  if (hasSep || isAbsolute(trimmed)) {
+    const full = isAbsolute(trimmed)
+      ? trimmed
+      : resolve(cwd ?? process.cwd(), trimmed);
+    return isExecutableFile(full) ? full : null;
+  }
+
+  const pathVar = env.PATH ?? "";
+  for (const dir of pathVar.split(delimiter)) {
+    if (!dir) continue;
+    const candidate = join(dir, trimmed);
+    if (isExecutableFile(candidate)) return candidate;
+  }
+  return null;
+}
+
+export function cliIsInstalled(
+  command: string,
+  env: PathEnv = process.env,
+  cwd?: string,
+): boolean {
+  return resolveExecutable(command, env, cwd) !== null;
+}
+
+export function requireCliInstalled(
+  command: string,
+  env: PathEnv = process.env,
+  cwd?: string,
+): void {
+  if (!cliIsInstalled(command, env, cwd)) {
+    throw new Error(cliNotFoundMessage(command));
+  }
+}
+
+/** User-facing CLI error. Never leak raw `spawn … ENOENT` from Node. */
+export function publicCliErrorMessage(err: unknown, commandHint = ""): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (isCliNotFound(err) || /spawn\s+\S+\s+ENOENT/i.test(message)) {
+    const fromSpawn = message.match(/spawn\s+(\S+)\s+ENOENT/i)?.[1];
+    const fromCli =
+      err instanceof CliError && err.command ? err.command : undefined;
+    return cliNotFoundMessage(fromCli || fromSpawn || commandHint || message);
+  }
+  return message;
 }
 
 export function cliTimeoutMs(): number {
@@ -58,6 +155,21 @@ export function runCli(opts: RunCliOptions): Promise<RunCliResult> {
     let child;
 
     try {
+      if (!cliIsInstalled(opts.command, opts.env, opts.cwd)) {
+        reject(
+          new CliError(
+            cliNotFoundMessage(opts.command),
+            opts.command,
+            opts.args,
+            null,
+            "",
+            "",
+            false,
+            "ENOENT",
+          ),
+        );
+        return;
+      }
       child = spawn(opts.command, opts.args, {
         cwd: opts.cwd,
         env: opts.env,
@@ -69,7 +181,7 @@ export function runCli(opts: RunCliOptions): Promise<RunCliResult> {
       reject(
         new CliError(
           e.code === "ENOENT"
-            ? `${opts.command} not found on PATH`
+            ? cliNotFoundMessage(opts.command)
             : e.message,
           opts.command,
           opts.args,
@@ -127,7 +239,7 @@ export function runCli(opts: RunCliOptions): Promise<RunCliResult> {
       reject(
         new CliError(
           err.code === "ENOENT"
-            ? `${opts.command} not found on PATH`
+            ? cliNotFoundMessage(opts.command)
             : err.message,
           opts.command,
           opts.args,

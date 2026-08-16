@@ -8,9 +8,11 @@ import {
 } from "../cli-args";
 import { claudeBin, claudeChildEnv } from "../env";
 import {
-  CliError,
   PROBE_TIMEOUT_MS,
   cliTimeoutMs,
+  isCliNotFound,
+  cliNotFoundMessage,
+  cliIsInstalled,
   runCli,
 } from "../run-cli";
 import type {
@@ -25,9 +27,18 @@ export const claudeProvider: AiProvider = {
 
   async isAvailable(): Promise<ProviderAvailability> {
     const env = claudeChildEnv();
+    const command = claudeBin();
+    if (!cliIsInstalled(command, env)) {
+      return {
+        available: false,
+        detail: cliNotFoundMessage(command),
+        reason: "missing",
+        cliInstalled: false,
+      };
+    }
     try {
       const result = await runCli({
-        command: claudeBin(),
+        command,
         args: [...CLAUDE_AUTH_STATUS_ARGS],
         env,
         timeoutMs: PROBE_TIMEOUT_MS,
@@ -40,22 +51,24 @@ export const claudeProvider: AiProvider = {
               result.stderr.trim() ||
               "Not logged in. Run `claude auth login`.",
             reason: "missing",
+            cliInstalled: true,
           };
         }
         return {
           available: false,
           detail: "Could not parse `claude auth status` output.",
           reason: "error",
+          cliInstalled: true,
         };
       }
-      return interpretClaudeAuthStatus(result.stdout);
+      return { ...interpretClaudeAuthStatus(result.stdout), cliInstalled: true };
     } catch (err) {
-      if (err instanceof CliError && err.code === "ENOENT") {
+      if (isCliNotFound(err)) {
         return {
           available: false,
-          detail:
-            "claude CLI not found on PATH. Install Claude Code, then run `claude auth login`.",
+          detail: cliNotFoundMessage(command),
           reason: "missing",
+          cliInstalled: false,
         };
       }
       const message = err instanceof Error ? err.message : String(err);
@@ -63,6 +76,7 @@ export const claudeProvider: AiProvider = {
         available: false,
         detail: `claude auth status failed: ${message}`,
         reason: "error",
+        cliInstalled: true,
       };
     }
   },
@@ -76,7 +90,7 @@ export const claudeProvider: AiProvider = {
         args: claudePrintArgs({
           schemaJson: JSON.stringify(req.schema),
           system: req.system,
-          model: process.env.AI_CLAUDE_MODEL,
+          model: req.model ?? process.env.AI_CLAUDE_MODEL,
         }),
         stdin: req.user,
         cwd,
@@ -98,6 +112,11 @@ export const claudeProvider: AiProvider = {
         throw new Error(outcome.message + hint);
       }
       return outcome.value as T;
+    } catch (err) {
+      if (isCliNotFound(err)) {
+        throw new Error(cliNotFoundMessage(claudeBin()));
+      }
+      throw err;
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

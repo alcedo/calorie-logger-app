@@ -7,10 +7,12 @@ import {
 } from "../cli-args";
 import { codexBin, codexChildEnv } from "../env";
 import {
-  CliError,
   PROBE_TIMEOUT_MS,
   cliTimeoutMs,
   firstJsonObject,
+  isCliNotFound,
+  cliNotFoundMessage,
+  cliIsInstalled,
   runCli,
 } from "../run-cli";
 import type {
@@ -25,9 +27,18 @@ export const codexProvider: AiProvider = {
 
   async isAvailable(): Promise<ProviderAvailability> {
     const env = codexChildEnv();
+    const command = codexBin();
+    if (!cliIsInstalled(command, env)) {
+      return {
+        available: false,
+        detail: cliNotFoundMessage(command),
+        reason: "missing",
+        cliInstalled: false,
+      };
+    }
     try {
       const result = await runCli({
-        command: codexBin(),
+        command,
         args: [...CODEX_LOGIN_STATUS_ARGS],
         env,
         timeoutMs: PROBE_TIMEOUT_MS,
@@ -37,20 +48,22 @@ export const codexProvider: AiProvider = {
         return {
           available: true,
           detail: text || "Logged in",
+          cliInstalled: true,
         };
       }
       return {
         available: false,
         detail: text || "Not logged in. Run `codex login`.",
         reason: "missing",
+        cliInstalled: true,
       };
     } catch (err) {
-      if (err instanceof CliError && err.code === "ENOENT") {
+      if (isCliNotFound(err)) {
         return {
           available: false,
-          detail:
-            "codex CLI not found on PATH. Install Codex, then run `codex login`.",
+          detail: cliNotFoundMessage(command),
           reason: "missing",
+          cliInstalled: false,
         };
       }
       const message = err instanceof Error ? err.message : String(err);
@@ -58,6 +71,7 @@ export const codexProvider: AiProvider = {
         available: false,
         detail: `codex login status failed: ${message}`,
         reason: "error",
+        cliInstalled: true,
       };
     }
   },
@@ -75,7 +89,7 @@ export const codexProvider: AiProvider = {
         args: codexExecArgs({
           schemaPath,
           outPath,
-          model: process.env.AI_CODEX_MODEL,
+          model: req.model ?? process.env.AI_CODEX_MODEL,
         }),
         stdin: prompt,
         cwd,
@@ -107,6 +121,11 @@ export const codexProvider: AiProvider = {
           );
         }
       }
+    } catch (err) {
+      if (isCliNotFound(err)) {
+        throw new Error(cliNotFoundMessage(codexBin()));
+      }
+      throw err;
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

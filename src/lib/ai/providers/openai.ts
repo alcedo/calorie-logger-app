@@ -5,7 +5,7 @@ import type {
   ProviderAvailability,
 } from "../types";
 
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const FALLBACK_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 let client: OpenAI | null = null;
 
@@ -41,7 +41,7 @@ export const openaiProvider: AiProvider = {
   async generateJson<T>(req: GenerateJsonRequest): Promise<T> {
     const openai = getClient();
     const response = await openai.chat.completions.create({
-      model: MODEL,
+      model: req.model || FALLBACK_MODEL,
       messages: [
         { role: "system", content: req.system },
         { role: "user", content: req.user },

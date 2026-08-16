@@ -118,4 +118,40 @@ describe("login sessions against fake CLIs", () => {
       /Timed out waiting for the login URL/,
     );
   });
+
+  it("maps a missing Codex binary to a readable error (not spawn ENOENT)", async () => {
+    stashEnv();
+    process.env.AI_CODEX_BIN = "/no/such/macro-codex-binary";
+    process.env.AI_LOGIN_START_WAIT_MS = "20000";
+    const started = Date.now();
+    await assert.rejects(() => startCodexLogin(), (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /codex CLI not found/i);
+      assert.doesNotMatch(err.message, /spawn /i);
+      assert.doesNotMatch(err.message, /ENOENT/);
+      return true;
+    });
+    assert.ok(
+      Date.now() - started < 2000,
+      "missing CLI must fail in preflight, not after spawn timeout",
+    );
+  });
+
+  it("maps a missing Claude binary to a readable error (not spawn ENOENT)", async () => {
+    stashEnv();
+    process.env.AI_CLAUDE_BIN = "/no/such/macro-claude-binary";
+    process.env.AI_LOGIN_START_WAIT_MS = "20000";
+    const started = Date.now();
+    await assert.rejects(() => startClaudeLogin(), (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /claude CLI not found/i);
+      assert.doesNotMatch(err.message, /spawn /i);
+      assert.doesNotMatch(err.message, /ENOENT/);
+      return true;
+    });
+    assert.ok(
+      Date.now() - started < 2000,
+      "missing CLI must fail in preflight, not after spawn timeout",
+    );
+  });
 });
