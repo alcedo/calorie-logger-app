@@ -76,7 +76,7 @@ export const claudeProvider: AiProvider = {
         args: claudePrintArgs({
           schemaJson: JSON.stringify(req.schema),
           system: req.system,
-          model: process.env.AI_CLAUDE_MODEL,
+          model: req.model ?? process.env.AI_CLAUDE_MODEL,
         }),
         stdin: req.user,
         cwd,

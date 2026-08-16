@@ -115,12 +115,19 @@ describe("POST /api/log", () => {
       logged: Array<{ foodName: string; quantity: number; calories: number }>;
       unresolved: unknown[];
       usedAiParser: boolean;
+      trace: Array<{ type: string; text?: string }>;
     }>(res);
 
     expect(status).toBe(200);
     expect(body.usedAiParser).toBe(false);
     expect(body.unresolved).toEqual([]);
     expect(body.logged).toHaveLength(2);
+    expect(body.trace.some((e) => e.type === "step")).toBe(true);
+    expect(
+      body.trace.some(
+        (e) => e.type === "thought" && /built-in parser/i.test(e.text),
+      ),
+    ).toBe(true);
 
     const egg = body.logged.find((e) => e.foodName === "Egg");
     const chicken = body.logged.find((e) => e.foodName === "Chicken Breast");
@@ -128,6 +135,24 @@ describe("POST /api/log", () => {
     expect(egg?.calories).toBe(144); // 72 * 2
     expect(chicken?.quantity).toBe(200);
     expect(chicken?.calories).toBe(330); // 165 * 2
+  });
+
+  it("streams thought-process events when stream=1", async () => {
+    const { POST } = await import("@/app/api/log/route");
+    const res = await POST(
+      jsonRequest(
+        "POST",
+        "/api/log?stream=1",
+        { text: "1 egg", date: "2026-08-15" },
+        { Accept: "text/event-stream" },
+      ),
+    );
+    expect(res.headers.get("content-type")).toMatch(/text\/event-stream/);
+    const text = await res.text();
+    expect(text).toMatch(/data: /);
+    expect(text).toMatch(/Reading your meal/);
+    expect(text).toMatch(/"type":"done"/);
+    expect(text).toMatch(/Egg/);
   });
 
   it("stores entries on the explicit date", async () => {
@@ -289,10 +314,14 @@ describe("POST /api/log with mocked AI", () => {
     const { body } = await readJson<{
       logged: Array<{ foodName: string; calories: number; foodSource?: string }>;
       unresolved: unknown[];
+      trace: Array<{ type: string; title?: string }>;
     }>(res);
     expect(body.unresolved).toEqual([]);
     expect(body.logged[0]?.foodName).toBe("Dragon Fruit");
     expect(body.logged[0]?.calories).toBe(120);
+    expect(
+      body.trace.some((e) => e.title && /searching the web/i.test(e.title)),
+    ).toBe(true);
     expect(
       db.select().from(foods).where(eq(foods.normalizedName, "dragon fruit")).get()
         ?.source

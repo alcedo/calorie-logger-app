@@ -4,6 +4,9 @@ import { eq } from "drizzle-orm";
 
 export const SETTING_AI_PROVIDER = "ai_provider";
 export const SETTING_CLAUDE_OAUTH_TOKEN = "claude_oauth_token";
+export const SETTING_AI_CLAUDE_MODEL = "ai_claude_model";
+export const SETTING_AI_CODEX_MODEL = "ai_codex_model";
+export const SETTING_AI_OPENAI_MODEL = "ai_openai_model";
 
 export function getSetting(key: string): string | undefined {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();

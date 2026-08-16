@@ -75,7 +75,7 @@ export const codexProvider: AiProvider = {
         args: codexExecArgs({
           schemaPath,
           outPath,
-          model: process.env.AI_CODEX_MODEL,
+          model: req.model ?? process.env.AI_CODEX_MODEL,
         }),
         stdin: prompt,
         cwd,

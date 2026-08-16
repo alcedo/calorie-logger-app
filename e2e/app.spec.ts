@@ -19,6 +19,20 @@ test("Today: AI-off banner and log meal updates dashboard", async ({
   await expect(page.getByText("Chicken Breast").first()).toBeVisible();
   // dashboard shows summed calories (144 + 330 = 474)
   await expect(page.getByText("474").first()).toBeVisible();
+  await expect(page.getByText("Thought process")).toBeVisible();
+  await expect(page.getByText(/built-in parser/i)).toBeVisible();
+  await expect(page.getByLabelText("AI provider")).toBeVisible();
+});
+
+test("AI page: provider and model pickers", async ({ page }) => {
+  await page.goto("/ai");
+  await expect(page.getByRole("heading", { name: "AI connections" })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByRole("heading", { name: /Provider and model/i })).toBeVisible();
+  await expect(page.getByLabelText("AI provider")).toBeVisible();
+  await expect(page.getByLabelText("claude model")).toBeVisible();
+  await expect(page.getByLabelText("codex model")).toBeVisible();
 });
 
 test("History: expand day loads entries", async ({ page }) => {

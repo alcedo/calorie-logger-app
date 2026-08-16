@@ -11,9 +11,21 @@ import { hasStrayAnthropicKey } from "./env";
 import { activeLogins } from "./login";
 import { resolveAiStatusView } from "./select";
 import {
+  catalogWithSelected,
+  labelForModel,
+  resolveModelFor,
+  selectedModelId,
+} from "./models";
+import {
   getSetting,
   SETTING_AI_PROVIDER,
 } from "../settings";
+import {
+  formatSearchResultsForPrompt,
+  searchNutritionWeb,
+  searchQueryFor,
+} from "@/lib/nutrition-search";
+import type { LogTraceListener } from "../log-trace";
 import type {
   AiNutrition,
   AiProvider,
@@ -34,6 +46,7 @@ export type {
   AiSelection,
   AiStatusDto,
   BannerKind,
+  ModelOptionDto,
   ParsedFoodItem,
   ProviderAvailability,
   ProviderId,
@@ -56,6 +69,15 @@ export {
   codexExecArgs,
 } from "./cli-args";
 export { validateClaudeSetupToken } from "./setup-token";
+export {
+  MODEL_CATALOG,
+  catalogWithSelected,
+  isAllowedModelId,
+  labelForModel,
+  normalizeModelId,
+  resolveModelFor,
+  selectedModelId,
+} from "./models";
 
 const PROVIDERS: Record<ProviderId, AiProvider> = {
   claude: claudeProvider,
@@ -123,11 +145,30 @@ export async function getAiStatus(): Promise<AiStatusDto> {
     invalidProviderRaw: process.env.AI_PROVIDER,
   });
 
+  const models = {
+    claude: selectedModelId("claude"),
+    codex: selectedModelId("codex"),
+    openai: selectedModelId("openai"),
+  };
+  const modelCatalog = {
+    claude: catalogWithSelected("claude", models.claude),
+    codex: catalogWithSelected("codex", models.codex),
+    openai: catalogWithSelected("openai", models.openai),
+  };
+  const activeModel = view.provider ? models[view.provider] : null;
+
   const value: AiStatusDto = {
     ...view,
     selection,
     providers,
     logins: activeLogins(),
+    models,
+    modelCatalog,
+    activeModel,
+    activeModelLabel:
+      view.provider && activeModel !== null
+        ? labelForModel(view.provider, activeModel)
+        : null,
   };
   statusCache = { at: now, value };
   return value;
@@ -153,14 +194,30 @@ async function requireProvider(): Promise<AiProvider> {
   return PROVIDERS[status.provider];
 }
 
-export async function parseMealText(text: string): Promise<ParsedFoodItem[]> {
+export interface AiCallOptions {
+  onEvent?: LogTraceListener;
+}
+
+export async function parseMealText(
+  text: string,
+  opts?: AiCallOptions,
+): Promise<ParsedFoodItem[]> {
   const provider = await requireProvider();
-  const parsed = await provider.generateJson<{ items: ParsedFoodItem[] }>({
+  const parsed = await provider.generateJson<{
+    items: ParsedFoodItem[];
+    reasoning?: string;
+  }>({
     system: PARSE_SYSTEM,
     user: text,
     schemaName: "meal_items",
     schema: PARSE_JSON_SCHEMA,
+    model: resolveModelFor(provider.id),
   });
+  const reasoning =
+    typeof parsed.reasoning === "string" ? parsed.reasoning.trim() : "";
+  if (reasoning) {
+    opts?.onEvent?.({ type: "thought", text: reasoning });
+  }
   const items = Array.isArray(parsed.items) ? parsed.items : [];
   return items.filter(
     (i) => i && typeof i.name === "string" && i.name.trim().length > 0,
@@ -208,25 +265,73 @@ function matchFood(
   );
 }
 
-/** Batch nutrition lookup. One CLI/API call for all names. */
+/** Batch nutrition lookup. Web search first, then one CLI/API call for all names. */
 export async function lookupNutrition(
   names: string[],
+  opts?: AiCallOptions,
 ): Promise<Map<string, AiNutrition>> {
   const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
   const out = new Map<string, AiNutrition>();
   if (unique.length === 0) return out;
 
+  const hitsByFood = new Map<string, Awaited<ReturnType<typeof searchNutritionWeb>>>();
+  for (const name of unique) {
+    const query = searchQueryFor(name);
+    opts?.onEvent?.({ type: "search", query });
+    const hits = await searchNutritionWeb(name);
+    hitsByFood.set(name, hits);
+    for (const hit of hits) {
+      opts?.onEvent?.({ type: "search_result", query, hit });
+    }
+    if (hits.length === 0) {
+      opts?.onEvent?.({
+        type: "step",
+        id: `search-empty-${name}`,
+        title: `No web results for ${name}`,
+        detail: "The model will estimate from training knowledge.",
+      });
+    }
+  }
+
   const provider = await requireProvider();
   const parsed = await provider.generateJson<{
     foods: Record<string, unknown>[];
+    reasoning?: string;
+    sources?: Array<{ title?: string; url?: string }>;
   }>({
     system: NUTRITION_SYSTEM,
     user: `Nutrition facts for these foods:\n${unique
       .map((n, i) => `${i + 1}. ${n}`)
-      .join("\n")}`,
+      .join("\n")}\n\nLive web search results:\n${formatSearchResultsForPrompt(
+      hitsByFood,
+    )}`,
     schemaName: "food_nutrition_batch",
     schema: BATCH_NUTRITION_JSON_SCHEMA,
+    model: resolveModelFor(provider.id),
   });
+
+  const reasoning =
+    typeof parsed.reasoning === "string" ? parsed.reasoning.trim() : "";
+  if (reasoning) {
+    opts?.onEvent?.({ type: "thought", text: reasoning });
+  }
+  const sources = Array.isArray(parsed.sources) ? parsed.sources : [];
+  for (const source of sources) {
+    const url = typeof source?.url === "string" ? source.url.trim() : "";
+    const title =
+      (typeof source?.title === "string" && source.title.trim()) || url;
+    if (!url) continue;
+    opts?.onEvent?.({
+      type: "search_result",
+      query: "cited source",
+      hit: {
+        title,
+        url,
+        snippet: "Cited by the model",
+        source: "web",
+      },
+    });
+  }
 
   const foods = Array.isArray(parsed.foods) ? parsed.foods : [];
   for (let i = 0; i < unique.length; i++) {

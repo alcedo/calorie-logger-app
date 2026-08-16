@@ -226,6 +226,29 @@ describe("history and status APIs", () => {
     else process.env.AI_PROVIDER = originalProvider;
     clearAiStatusCache();
   });
+
+  it("saves provider and model preference", async () => {
+    const originalProvider = process.env.AI_PROVIDER;
+    delete process.env.AI_PROVIDER;
+    const { clearAiStatusCache } = await import("@/lib/ai");
+    const { POST } = await import("@/app/api/ai/route");
+    const res = await POST(
+      jsonRequest("POST", "/api/ai", {
+        action: "preference",
+        selection: "none",
+        models: { claude: "haiku" },
+      }),
+    );
+    const { status, body } = await readJson<{
+      status: { selection: string; models: { claude: string } };
+    }>(res);
+    expect(status).toBe(200);
+    expect(body.status.selection).toBe("none");
+    expect(body.status.models.claude).toBe("haiku");
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER;
+    else process.env.AI_PROVIDER = originalProvider;
+    clearAiStatusCache();
+  });
 });
 
 describe("multi-step flows", () => {

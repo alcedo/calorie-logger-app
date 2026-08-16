@@ -42,6 +42,13 @@ export interface GenerateJsonRequest {
   user: string;
   schemaName: string;
   schema: Record<string, unknown>;
+  /** Provider-specific model id. Omit to use the CLI/SDK default. */
+  model?: string;
+}
+
+export interface ModelOptionDto {
+  id: string;
+  label: string;
 }
 
 export interface AiProvider {
@@ -83,4 +90,8 @@ export interface AiStatusDto {
   bannerKind: BannerKind;
   bannerMessage: string | null;
   logins: AiLoginSessionDto[];
+  models: Record<ProviderId, string>;
+  modelCatalog: Record<ProviderId, ModelOptionDto[]>;
+  activeModel: string | null;
+  activeModelLabel: string | null;
 }

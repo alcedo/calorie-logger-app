@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createMock = vi.fn();
+const searchNutritionWeb = vi.fn();
 
 vi.mock("openai", () => {
   class OpenAI {
@@ -13,6 +14,14 @@ vi.mock("openai", () => {
   return { default: OpenAI };
 });
 
+vi.mock("@/lib/nutrition-search", () => ({
+  searchNutritionWeb: (...args: unknown[]) => searchNutritionWeb(...args),
+  searchQueryFor: (name: string) =>
+    `${name} nutrition facts calories protein carbs fat USDA`,
+  formatSearchResultsForPrompt: (byFood: Map<string, unknown[]>) =>
+    `SEARCH:${[...byFood.keys()].join(",")}`,
+}));
+
 describe("ai module", () => {
   const ORIGINAL_KEY = process.env.OPENAI_API_KEY;
   const ORIGINAL_MODEL = process.env.OPENAI_MODEL;
@@ -20,6 +29,15 @@ describe("ai module", () => {
 
   beforeEach(async () => {
     createMock.mockReset();
+    searchNutritionWeb.mockReset();
+    searchNutritionWeb.mockResolvedValue([
+      {
+        title: "Dragon Fruit",
+        url: "https://fdc.nal.usda.gov/example",
+        snippet: "60 kcal per serving",
+        source: "usda",
+      },
+    ]);
     delete process.env.OPENAI_API_KEY;
     delete process.env.AI_PROVIDER;
     vi.resetModules();
@@ -51,6 +69,9 @@ describe("ai module", () => {
     const status = await getAiStatus();
     expect(status.aiAvailable).toBe(true);
     expect(status.provider).toBe("openai");
+    expect(status.models.openai).toBe("gpt-4o-mini");
+    expect(status.modelCatalog.openai.length).toBeGreaterThan(0);
+    expect(status.activeModelLabel).toMatch(/GPT-4o mini/);
   });
 
   it("parseMealText returns filtered items from OpenAI JSON", async () => {
@@ -61,6 +82,7 @@ describe("ai module", () => {
         {
           message: {
             content: JSON.stringify({
+              reasoning: "Two eggs.",
               items: [
                 { name: "egg", quantity: 2, unit: "serving" },
                 { name: "  ", quantity: 1, unit: "serving" },
@@ -71,9 +93,15 @@ describe("ai module", () => {
       ],
     });
     const { parseMealText } = await import("./ai");
-    await expect(parseMealText("2 eggs")).resolves.toEqual([
-      { name: "egg", quantity: 2, unit: "serving" },
-    ]);
+    const thoughts: string[] = [];
+    await expect(
+      parseMealText("2 eggs", {
+        onEvent: (e) => {
+          if (e.type === "thought") thoughts.push(e.text);
+        },
+      }),
+    ).resolves.toEqual([{ name: "egg", quantity: 2, unit: "serving" }]);
+    expect(thoughts).toEqual(["Two eggs."]);
   });
 
   it("parseMealText throws when OpenAI content is missing", async () => {
@@ -109,10 +137,13 @@ describe("ai module", () => {
       sodium: 2,
     };
     createMock.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify({ foods: [nutrition] }) } }],
+      choices: [{ message: { content: JSON.stringify({ foods: [nutrition], reasoning: "USDA", sources: [] }) } }],
     });
     const { lookupNutrition } = await import("./ai");
-    const map = await lookupNutrition(["dragon fruit"]);
+    const events: Array<{ type: string }> = [];
+    const map = await lookupNutrition(["dragon fruit"], {
+      onEvent: (e) => events.push(e),
+    });
     expect(map.get("dragon fruit")).toEqual({
       name: "Dragon Fruit",
       aliases: ["pitaya"],
@@ -126,6 +157,14 @@ describe("ai module", () => {
       sugar: 18,
       sodium: 2,
     });
+    expect(searchNutritionWeb).toHaveBeenCalledWith("dragon fruit");
+    expect(events.some((e) => e.type === "search")).toBe(true);
+    expect(events.some((e) => e.type === "thought")).toBe(true);
+    const user = createMock.mock.calls[0][0].messages.find(
+      (m: { role: string }) => m.role === "user",
+    );
+    expect(user.content).toContain("SEARCH:dragon fruit");
+    expect(typeof createMock.mock.calls[0][0].model).toBe("string");
   });
 
   it("lookupNutrition throws when content is empty", async () => {

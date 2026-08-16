@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { AiLoginSessionDto, AiStatusDto } from "@/lib/ai/types";
+import { AiPicker } from "@/components/AiPicker";
+import type { AiLoginSessionDto, AiStatusDto, ProviderId } from "@/lib/ai/types";
 
 type ProviderCard = "claude" | "codex";
 
@@ -140,8 +141,11 @@ export default function AiPage() {
     }
   }
 
-  async function setPreference(selection: string) {
-    const data = await postAi({ action: "preference", selection });
+  async function setPreference(patch: {
+    selection?: string;
+    models?: Partial<Record<ProviderId, string>>;
+  }) {
+    const data = await postAi({ action: "preference", ...patch });
     if (data.status) setStatus(data.status);
   }
 
@@ -156,7 +160,9 @@ export default function AiPage() {
         <h1 className="text-lg font-semibold text-zinc-100">AI connections</h1>
         <p className="mt-1 text-sm text-zinc-400">
           Link the Claude or ChatGPT subscription you already pay for. No API
-          keys. Unknown foods then look up automatically when you log a meal.
+          keys. Unknown foods then look up automatically — the model searches
+          USDA, Open Food Facts, and the web, and you can watch its thought
+          process while logging.
         </p>
       </header>
 
@@ -343,25 +349,14 @@ export default function AiPage() {
       </section>
 
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
-        <h2 className="text-sm font-semibold text-zinc-200">Which one to use</h2>
-        <div className="mt-3 flex flex-col gap-2 text-sm text-zinc-300">
-          {(
-            [
-              ["auto", "Auto — Claude if connected, otherwise ChatGPT"],
-              ["claude", "Always Claude"],
-              ["codex", "Always ChatGPT (Codex)"],
-            ] as const
-          ).map(([value, label]) => (
-            <label key={value} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="pref"
-                checked={(status?.selection ?? "auto") === value}
-                onChange={() => setPreference(value)}
-              />
-              {label}
-            </label>
-          ))}
+        <h2 className="text-sm font-semibold text-zinc-200">Provider and model</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Choose which connected subscription (or paid OpenAI key) to use, and
+          which model it should call. Auto picks Claude if it is signed in,
+          otherwise ChatGPT.
+        </p>
+        <div className="mt-4">
+          <AiPicker status={status} onChange={setPreference} showAllModels />
         </div>
       </section>
     </div>

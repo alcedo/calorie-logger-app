@@ -9,14 +9,16 @@ The app parses the sentence, figures out calories, protein, carbs, fat (plus fib
 ## How food lookup works
 
 1. **Local SQLite database first** — the app ships with ~110 common foods and checks exact, alias, and fuzzy name matches.
-2. **AI fallback** — if a food isn't in the database, the connected LLM looks up accurate per-serving nutrition facts.
+2. **AI fallback** — if a food isn't in the database, the app searches USDA FoodData Central, Open Food Facts, and the web, then the connected LLM reads those results and returns per-serving nutrition. You can watch the thought process (parse reasoning, search queries, and sources) while a meal is logged.
 3. **Caching** — AI results are saved back into SQLite, so each food is only ever looked up once.
 
-AI is powered by your **Claude subscription** by default (`claude auth login`). A ChatGPT login via `codex login` is the secondary option. An OpenAI API key is a paid opt-in and is never selected automatically.
+Pick a **provider and model** on the Today page or the AI page. Claude Code login is the default; ChatGPT/Codex is next; an OpenAI API key is a paid opt-in and is never selected automatically.
 
 ## Features
 
 - **Text and voice logging** — chat-style input with a mic button (browser Web Speech API; Chrome/Edge/Safari)
+- **Visible AI thought process** — live steps, model reasoning, and nutrition web-search results while logging
+- **Provider and model picker** — Claude, ChatGPT/Codex, or OpenAI API, with a model dropdown per provider
 - **Daily dashboard** — calorie ring plus protein/carbs/fat progress bars against your goals
 - **History** — per-day totals with expandable entry lists
 - **Foods & Goals** — browse/edit the food database (built-in, AI-cached, and custom foods) and set daily targets
@@ -62,8 +64,10 @@ See [`.env.example`](.env.example). Useful variables:
 | Variable | Purpose |
 | --- | --- |
 | `AI_PROVIDER` | `auto` (default), `claude`, `codex`, `openai`, `none` |
-| `AI_CLAUDE_MODEL` | Optional Claude model override (e.g. `haiku`) |
-| `AI_CODEX_MODEL` | Optional Codex model override |
+| `AI_CLAUDE_MODEL` | Optional Claude model if the in-app picker has not set one (e.g. `haiku`) |
+| `AI_CODEX_MODEL` | Optional Codex model if the in-app picker has not set one |
+| `OPENAI_MODEL` | OpenAI model if the in-app picker has not set one (default `gpt-4o-mini`) |
+| `USDA_API_KEY` | Optional [FoodData Central](https://fdc.nal.usda.gov/api-guide.html) key; falls back to `DEMO_KEY` |
 | `AI_CLI_TIMEOUT_MS` | Subprocess timeout, minimum 20000, default 60000 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Headless fallback; prefer `claude auth login` |
 | `OPENAI_API_KEY` | Paid opt-in; requires `AI_PROVIDER=openai` |
@@ -87,17 +91,18 @@ After you connect a subscription, `npm run ai:doctor` runs a live meal parse. `n
 - Next.js 16 (App Router, TypeScript) — UI and API routes in one codebase
 - SQLite via better-sqlite3 + Drizzle ORM
 - Claude Code / Codex CLI structured JSON for meal parsing and nutrition lookup (OpenAI API opt-in)
+- USDA FoodData Central + Open Food Facts + DuckDuckGo for live nutrition search
 - Tailwind CSS
 
 ## API overview
 
 | Route | Purpose |
 | --- | --- |
-| `POST /api/log` | Parse a meal sentence, resolve foods (DB then AI), create entries |
+| `POST /api/log` | Parse a meal sentence, resolve foods (DB then web search + AI), create entries. `?stream=1` or `Accept: text/event-stream` streams the thought process as SSE. |
 | `GET /api/entries?date=` | Entries + totals + goals for a day |
 | `PATCH/DELETE /api/entries/:id` | Edit quantity / delete an entry |
 | `GET/POST /api/foods`, `PATCH/DELETE /api/foods/:id` | Food database CRUD |
 | `GET/PUT /api/goals` | Daily macro targets |
 | `GET /api/history?days=` | Per-day totals |
-| `GET /api/status` | Active AI provider and whether lookup is configured |
-| `POST /api/ai` | Connect / disconnect Claude or ChatGPT subscription login |
+| `GET /api/status` | Active AI provider, model catalog, and whether lookup is configured |
+| `POST /api/ai` | Connect / disconnect logins; `preference` saves provider and model |

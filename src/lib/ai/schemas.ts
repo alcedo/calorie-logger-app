@@ -9,13 +9,19 @@ export const PARSE_SYSTEM = [
   "- '200g chicken breast' -> name 'chicken breast', quantity 200, unit 'g'.",
   "- If no quantity is given, use quantity 1 and unit 'serving'.",
   "- Ignore anything that is not food or drink.",
+  "- Put a short reasoning in `reasoning`: how you split the sentence and any assumptions.",
 ].join("\n");
 
 export const PARSE_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["items"],
+  required: ["reasoning", "items"],
   properties: {
+    reasoning: {
+      type: "string",
+      description:
+        "Brief thought process: how the sentence was split and any quantity/unit assumptions.",
+    },
     items: {
       type: "array",
       items: {
@@ -45,13 +51,16 @@ export const PARSE_JSON_SCHEMA: Record<string, unknown> = {
 };
 
 export const NUTRITION_SYSTEM = [
-  "You are a nutrition database. Given one or more food names, return the most",
-  "accurate, up-to-date nutrition facts per one natural serving for each,",
-  "based on USDA FoodData Central or official brand data.",
+  "You are a nutrition database. Given one or more food names plus live web",
+  "search results (USDA FoodData Central, Open Food Facts, and web pages),",
+  "return the most accurate, up-to-date nutrition facts per one natural serving.",
+  "Prefer USDA numbers when they match the food; otherwise official brand data.",
   "Choose the serving people typically log (1 medium fruit, 1 slice,",
   "100 g for meats, 1 cup for cooked grains). Include the gram",
   "weight in servingUnit when the unit is not grams.",
   "Return one object per requested food. Set query to the food name exactly as given.",
+  "Explain in `reasoning` which sources you trusted and any serving-size assumptions.",
+  "List the URLs you relied on in `sources`.",
 ].join("\n");
 
 const NUTRITION_ITEM_PROPERTIES = {
@@ -104,8 +113,25 @@ export const NUTRITION_ITEM_JSON_SCHEMA: Record<string, unknown> = {
 export const BATCH_NUTRITION_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["foods"],
+  required: ["reasoning", "sources", "foods"],
   properties: {
+    reasoning: {
+      type: "string",
+      description:
+        "Thought process: which web results you used and how you chose serving sizes.",
+    },
+    sources: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "url"],
+        properties: {
+          title: { type: "string" },
+          url: { type: "string" },
+        },
+      },
+    },
     foods: {
       type: "array",
       items: NUTRITION_ITEM_JSON_SCHEMA,

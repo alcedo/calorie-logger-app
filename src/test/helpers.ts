@@ -53,16 +53,19 @@ export function setupTempDatabase(): void {
 export function jsonRequest(
   method: string,
   url: string,
-  body?: unknown
+  body?: unknown,
+  extraHeaders?: Record<string, string>
 ): NextRequest {
   return new NextRequest(new URL(url, "http://localhost:3000"), {
     method,
     ...(body !== undefined
       ? {
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...extraHeaders },
           body: JSON.stringify(body),
         }
-      : {}),
+      : extraHeaders
+        ? { headers: extraHeaders }
+        : {}),
   });
 }
 
