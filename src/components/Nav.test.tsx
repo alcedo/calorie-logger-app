@@ -37,8 +37,13 @@ describe("Nav", () => {
       "href",
       "/history"
     );
-    expect(
-      screen.getByRole("link", { name: /Foods & Goals/i })
-    ).toHaveAttribute("href", "/foods");
+    expect(screen.getByRole("link", { name: /Foods/i })).toHaveAttribute(
+      "href",
+      "/foods"
+    );
+    expect(screen.getByRole("link", { name: /^AI$/i })).toHaveAttribute(
+      "href",
+      "/ai"
+    );
   });
 });

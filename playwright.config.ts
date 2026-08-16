@@ -27,6 +27,7 @@ export default defineConfig({
       ...process.env,
       CALORIE_LOGGER_DB_PATH: e2eDb,
       OPENAI_API_KEY: "",
+      AI_PROVIDER: "none",
     },
   },
 });

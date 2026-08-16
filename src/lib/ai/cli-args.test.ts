@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import {
   CLAUDE_AUTH_LOGIN_ARGS,
   CLAUDE_AUTH_STATUS_ARGS,

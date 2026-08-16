@@ -173,6 +173,7 @@ export function clearEntriesForTests(): void {
   const sqlite = globalThis.__calorieLoggerSqlite;
   if (!sqlite) return;
   sqlite.exec("DELETE FROM entries");
+  sqlite.exec("DELETE FROM settings");
   sqlite
     .prepare(
       "UPDATE goals SET calories = 2000, protein = 120, carbs = 225, fat = 65 WHERE id = 1"

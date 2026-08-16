@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chmodSync, readFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, before, describe, it } from "node:test";
+import { afterEach, beforeAll, describe, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import {
   activeLogins,
@@ -42,7 +42,7 @@ function restoreEnv() {
 }
 
 describe("login sessions against fake CLIs", () => {
-  before(() => {
+  beforeAll(() => {
     chmodSync(fakeClaude, 0o755);
     chmodSync(fakeCodex, 0o755);
     chmodSync(fakeSilent, 0o755);

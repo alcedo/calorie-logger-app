@@ -177,7 +177,7 @@ describe("POST /api/log", () => {
     }>(res);
     expect(body.logged.some((e) => e.foodName === "Egg")).toBe(true);
     expect(body.unresolved.length).toBeGreaterThanOrEqual(1);
-    expect(body.unresolved[0].reason).toMatch(/AI lookup is not configured/i);
+    expect(body.unresolved[0].reason).toMatch(/AI is not configured/i);
   });
 });
 
@@ -196,7 +196,11 @@ describe("POST /api/log with mocked AI", () => {
 
   it("sets usedAiParser when parseMealText succeeds", async () => {
     vi.doMock("@/lib/ai", () => ({
-      aiAvailable: () => true,
+      getAiStatus: vi.fn().mockResolvedValue({
+        aiAvailable: true,
+        provider: "claude",
+        bannerMessage: null,
+      }),
       parseMealText: vi.fn().mockResolvedValue([
         { name: "egg", quantity: 1, unit: "serving" },
       ]),
@@ -219,7 +223,11 @@ describe("POST /api/log with mocked AI", () => {
 
   it("falls back to fallbackParse when AI parse throws", async () => {
     vi.doMock("@/lib/ai", () => ({
-      aiAvailable: () => true,
+      getAiStatus: vi.fn().mockResolvedValue({
+        aiAvailable: true,
+        provider: "claude",
+        bannerMessage: null,
+      }),
       parseMealText: vi.fn().mockRejectedValue(new Error("boom")),
       lookupNutrition: vi.fn(),
       AiUnavailableError: class extends Error {},
@@ -241,23 +249,34 @@ describe("POST /api/log with mocked AI", () => {
 
   it("caches AI nutrition for unknown foods", async () => {
     vi.doMock("@/lib/ai", () => ({
-      aiAvailable: () => true,
+      getAiStatus: vi.fn().mockResolvedValue({
+        aiAvailable: true,
+        provider: "claude",
+        bannerMessage: null,
+      }),
       parseMealText: vi.fn().mockResolvedValue([
         { name: "dragon fruit", quantity: 1, unit: "serving" },
       ]),
-      lookupNutrition: vi.fn().mockResolvedValue({
-        name: "Dragon Fruit",
-        aliases: ["pitaya"],
-        servingSize: 1,
-        servingUnit: "medium",
-        calories: 120,
-        protein: 2,
-        carbs: 26,
-        fat: 0.5,
-        fiber: 5,
-        sugar: 18,
-        sodium: 2,
-      }),
+      lookupNutrition: vi.fn().mockResolvedValue(
+        new Map([
+          [
+            "dragon fruit",
+            {
+              name: "Dragon Fruit",
+              aliases: ["pitaya"],
+              servingSize: 1,
+              servingUnit: "medium",
+              calories: 120,
+              protein: 2,
+              carbs: 26,
+              fat: 0.5,
+              fiber: 5,
+              sugar: 18,
+              sodium: 2,
+            },
+          ],
+        ])
+      ),
       AiUnavailableError: class extends Error {},
     }));
     const { POST } = await import("@/app/api/log/route");
@@ -282,7 +301,11 @@ describe("POST /api/log with mocked AI", () => {
 
   it("partially succeeds when nutrition lookup fails for one item", async () => {
     vi.doMock("@/lib/ai", () => ({
-      aiAvailable: () => true,
+      getAiStatus: vi.fn().mockResolvedValue({
+        aiAvailable: true,
+        provider: "claude",
+        bannerMessage: null,
+      }),
       parseMealText: vi.fn().mockResolvedValue([
         { name: "egg", quantity: 1, unit: "serving" },
         { name: "mystery goo", quantity: 1, unit: "serving" },
