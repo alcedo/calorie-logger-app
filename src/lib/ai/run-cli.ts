@@ -54,13 +54,18 @@ function isExecutableFile(filePath: string): boolean {
   }
 }
 
+type PathEnv = {
+  PATH?: string;
+  [key: string]: string | undefined;
+};
+
 /**
  * Resolve a CLI the same way POSIX `spawn(command, { env, cwd })` does:
  * paths with a separator are used as-is (relative to cwd); bare names search PATH.
  */
 export function resolveExecutable(
   command: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: PathEnv = process.env,
   cwd?: string,
 ): string | null {
   const trimmed = command.trim();
@@ -85,7 +90,7 @@ export function resolveExecutable(
 
 export function cliIsInstalled(
   command: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: PathEnv = process.env,
   cwd?: string,
 ): boolean {
   return resolveExecutable(command, env, cwd) !== null;
@@ -93,7 +98,7 @@ export function cliIsInstalled(
 
 export function requireCliInstalled(
   command: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: PathEnv = process.env,
   cwd?: string,
 ): void {
   if (!cliIsInstalled(command, env, cwd)) {
