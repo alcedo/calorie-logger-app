@@ -11,6 +11,8 @@ import {
   CliError,
   PROBE_TIMEOUT_MS,
   cliTimeoutMs,
+  isCliNotFound,
+  cliNotFoundMessage,
   runCli,
 } from "../run-cli";
 import type {
@@ -98,6 +100,11 @@ export const claudeProvider: AiProvider = {
         throw new Error(outcome.message + hint);
       }
       return outcome.value as T;
+    } catch (err) {
+      if (isCliNotFound(err)) {
+        throw new Error(cliNotFoundMessage(claudeBin()));
+      }
+      throw err;
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

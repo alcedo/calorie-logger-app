@@ -249,6 +249,46 @@ describe("history and status APIs", () => {
     else process.env.AI_PROVIDER = originalProvider;
     clearAiStatusCache();
   });
+
+  it("connect Codex without a CLI returns a readable error, not spawn ENOENT", async () => {
+    const originalBin = process.env.AI_CODEX_BIN;
+    const originalWait = process.env.AI_LOGIN_START_WAIT_MS;
+    process.env.AI_CODEX_BIN = "/no/such/macro-codex-binary";
+    process.env.AI_LOGIN_START_WAIT_MS = "2000";
+    const { POST } = await import("@/app/api/ai/route");
+    const res = await POST(
+      jsonRequest("POST", "/api/ai", { action: "connect", provider: "codex" }),
+    );
+    const { status, body } = await readJson<{ error: string }>(res);
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/codex CLI not found/i);
+    expect(body.error).not.toMatch(/spawn /i);
+    expect(body.error).not.toMatch(/ENOENT/);
+    if (originalBin === undefined) delete process.env.AI_CODEX_BIN;
+    else process.env.AI_CODEX_BIN = originalBin;
+    if (originalWait === undefined) delete process.env.AI_LOGIN_START_WAIT_MS;
+    else process.env.AI_LOGIN_START_WAIT_MS = originalWait;
+  });
+
+  it("connect Claude without a CLI returns a readable error, not spawn ENOENT", async () => {
+    const originalBin = process.env.AI_CLAUDE_BIN;
+    const originalWait = process.env.AI_LOGIN_START_WAIT_MS;
+    process.env.AI_CLAUDE_BIN = "/no/such/macro-claude-binary";
+    process.env.AI_LOGIN_START_WAIT_MS = "2000";
+    const { POST } = await import("@/app/api/ai/route");
+    const res = await POST(
+      jsonRequest("POST", "/api/ai", { action: "connect", provider: "claude" }),
+    );
+    const { status, body } = await readJson<{ error: string }>(res);
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/claude CLI not found/i);
+    expect(body.error).not.toMatch(/spawn /i);
+    expect(body.error).not.toMatch(/ENOENT/);
+    if (originalBin === undefined) delete process.env.AI_CLAUDE_BIN;
+    else process.env.AI_CLAUDE_BIN = originalBin;
+    if (originalWait === undefined) delete process.env.AI_LOGIN_START_WAIT_MS;
+    else process.env.AI_LOGIN_START_WAIT_MS = originalWait;
+  });
 });
 
 describe("multi-step flows", () => {

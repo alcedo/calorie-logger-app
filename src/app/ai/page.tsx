@@ -185,6 +185,9 @@ export default function AiPage() {
             <p className="mt-1 text-xs text-zinc-500">
               Pro / Max / Team subscription via Claude Code
             </p>
+            {!claudeOn && claude?.detail && (
+              <p className="mt-2 text-xs text-amber-400/90">{claude.detail}</p>
+            )}
           </div>
           <StatusPill
             ok={claudeOn}
@@ -295,6 +298,9 @@ export default function AiPage() {
             <p className="mt-1 text-xs text-zinc-500">
               ChatGPT Plus / Pro subscription via Codex login — not an API key
             </p>
+            {!codexOn && codex?.detail && (
+              <p className="mt-2 text-xs text-amber-400/90">{codex.detail}</p>
+            )}
           </div>
           <StatusPill ok={codexOn} label={codexOn ? "Connected" : "Not connected"} />
         </div>

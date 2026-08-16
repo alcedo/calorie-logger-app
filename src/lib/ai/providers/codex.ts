@@ -11,6 +11,8 @@ import {
   PROBE_TIMEOUT_MS,
   cliTimeoutMs,
   firstJsonObject,
+  isCliNotFound,
+  cliNotFoundMessage,
   runCli,
 } from "../run-cli";
 import type {
@@ -107,6 +109,11 @@ export const codexProvider: AiProvider = {
           );
         }
       }
+    } catch (err) {
+      if (isCliNotFound(err)) {
+        throw new Error(cliNotFoundMessage(codexBin()));
+      }
+      throw err;
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

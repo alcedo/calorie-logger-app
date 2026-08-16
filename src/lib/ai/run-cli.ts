@@ -21,6 +21,39 @@ export class CliError extends Error {
   }
 }
 
+export function isCliNotFound(err: unknown): boolean {
+  if (err == null) return false;
+  if (typeof err === "object") {
+    const e = err as { code?: string; message?: string };
+    if (e.code === "ENOENT") return true;
+    if (typeof e.message === "string" && /ENOENT/i.test(e.message)) return true;
+  }
+  return /ENOENT/i.test(String(err));
+}
+
+export function cliNotFoundMessage(command: string): string {
+  const base = command.split(/[/\\]/).pop() || command;
+  if (/codex/i.test(base) || /codex/i.test(command)) {
+    return "codex CLI not found on PATH. Install Codex, then connect ChatGPT again.";
+  }
+  if (/claude/i.test(base) || /claude/i.test(command)) {
+    return "claude CLI not found on PATH. Install Claude Code, then connect Claude again.";
+  }
+  return `${base} not found on PATH.`;
+}
+
+/** User-facing CLI error. Never leak raw `spawn … ENOENT` from Node. */
+export function publicCliErrorMessage(err: unknown, commandHint = ""): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (isCliNotFound(err) || /spawn\s+\S+\s+ENOENT/i.test(message)) {
+    const fromSpawn = message.match(/spawn\s+(\S+)\s+ENOENT/i)?.[1];
+    const fromCli =
+      err instanceof CliError && err.command ? err.command : undefined;
+    return cliNotFoundMessage(fromCli || fromSpawn || commandHint || message);
+  }
+  return message;
+}
+
 export function cliTimeoutMs(): number {
   const raw = process.env.AI_CLI_TIMEOUT_MS;
   if (!raw) return DEFAULT_CLI_TIMEOUT_MS;

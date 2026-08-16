@@ -8,6 +8,7 @@ import {
   CODEX_LOGOUT_ARGS,
 } from "./cli-args";
 import { parseClaudeLoginOutput, parseCodexDeviceAuthOutput } from "./login-parse";
+import { isCliNotFound, cliNotFoundMessage } from "./run-cli";
 
 export type LoginKind = "claude" | "codex";
 
@@ -178,6 +179,9 @@ async function spawnUntilParsed(
     await waitFor(sessionBuf, child, parse, startWaitMs());
   } catch (err) {
     killChild(child);
+    if (isCliNotFound(err)) {
+      throw new Error(cliNotFoundMessage(command));
+    }
     throw err;
   }
   return { child, sessionBuf, closed };

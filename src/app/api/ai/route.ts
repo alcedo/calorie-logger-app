@@ -11,6 +11,7 @@ import {
 } from "@/lib/ai/login";
 import { isAllowedModelId, normalizeModelId } from "@/lib/ai/models";
 import { validateClaudeSetupToken } from "@/lib/ai/setup-token";
+import { publicCliErrorMessage } from "@/lib/ai/run-cli";
 import {
   deleteSetting,
   setSetting,
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = publicCliErrorMessage(err);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
