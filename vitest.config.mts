@@ -15,10 +15,6 @@ export default defineConfig({
     globals: false,
     setupFiles: ["./src/test/setup.ts"],
     environment: "node",
-    environmentMatchGlobs: [
-      ["**/components/**/*.test.tsx", "jsdom"],
-      ["**/*.component.test.tsx", "jsdom"],
-    ],
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     pool: "forks",
     fileParallelism: false,
