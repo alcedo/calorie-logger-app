@@ -125,7 +125,7 @@ describe("POST /api/log", () => {
     expect(body.trace.some((e) => e.type === "step")).toBe(true);
     expect(
       body.trace.some(
-        (e) => e.type === "thought" && /built-in parser/i.test(e.text),
+        (e) => e.type === "thought" && !!e.text && /built-in parser/i.test(e.text),
       ),
     ).toBe(true);
 
