@@ -28,6 +28,7 @@ Pick a **provider and model** on the Today page or the AI page. Claude Code logi
 
 ```bash
 npm install
+bash scripts/install-ai-clis.sh   # Claude Code + Codex CLIs into ~/.local/bin
 # Sign in with Claude Code (uses your subscription, no API key):
 claude auth login
 npm run dev
@@ -39,7 +40,7 @@ Without a signed-in CLI, the app still works for foods already in the database (
 
 Open **AI** in the app to connect a Claude or ChatGPT subscription from your phone: Claude shows a login link plus a code to paste; ChatGPT uses Codex device-auth (open the page, type the one-time code). No API keys.
 
-The Claude Code and Codex CLIs must be installed **on the computer that runs this app** (the Next.js server), not on your phone. If a CLI is missing, Connect is disabled and the page explains how to install it. `POST /api/ai` `{ action: "connect" }` also refuses to spawn a missing binary.
+The Claude Code and Codex CLIs must be installed **on the computer that runs this app** (the Next.js server), not on your phone. `scripts/install-ai-clis.sh` does that (Cloud Agent setup runs the same official installers). If a CLI is missing, Connect is disabled and the page explains how to install it. `POST /api/ai` `{ action: "connect" }` also refuses to spawn a missing binary.
 
 ### Claude subscription (default)
 
