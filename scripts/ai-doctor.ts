@@ -12,6 +12,8 @@ import {
   interpretClaudeAuthStatus,
   interpretClaudePrintResult,
   lookupNutrition,
+  parseClaudeLoginOutput,
+  parseCodexDeviceAuthOutput,
   parseMealText,
 } from "../src/lib/ai";
 
@@ -100,6 +102,31 @@ async function fixtureChecks() {
   );
   if (!sub.available) fail(`subscription login rejected: ${sub.detail}`);
   pass("claude.ai + max is accepted");
+
+  const claudeUrl = parseClaudeLoginOutput(
+    "Opening browser to sign in…\nIf the browser didn't open, visit: https://claude.com/cai/oauth/authorize?code=true&client_id=abc\nPaste code here if prompted >",
+  );
+  if (!claudeUrl?.loginUrl.includes("claude.com/cai/oauth/authorize")) {
+    fail("failed to parse Claude login URL");
+  }
+  pass("Claude login URL parsed");
+
+  const codexDev = parseCodexDeviceAuthOutput(
+    [
+      "Follow these steps to sign in with ChatGPT using device code authorization:",
+      "1. Open this link in your browser and sign in to your account",
+      "   \x1b[94mhttps://auth.openai.com/codex/device\x1b[0m",
+      "2. Enter this one-time code \x1b[90m(expires in 15 minutes)\x1b[0m",
+      "   \x1b[94mUBN6-U35TZ\x1b[0m",
+    ].join("\n"),
+  );
+  if (codexDev?.loginUrl !== "https://auth.openai.com/codex/device") {
+    fail(`codex url: ${codexDev?.loginUrl}`);
+  }
+  if (codexDev?.userCode !== "UBN6-U35TZ") {
+    fail(`codex code: ${codexDev?.userCode}`);
+  }
+  pass("Codex device-auth URL and code parsed");
 }
 
 async function liveChecks() {

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { interpretClaudeAuthStatus, interpretClaudePrintResult } from "../claude-parse";
-import { claudeChildEnv } from "../env";
+import { claudeBin, claudeChildEnv } from "../env";
 import {
   CliError,
   PROBE_TIMEOUT_MS,
@@ -14,10 +14,6 @@ import type {
   GenerateJsonRequest,
   ProviderAvailability,
 } from "../types";
-
-function claudeBin(): string {
-  return process.env.AI_CLAUDE_BIN || "claude";
-}
 
 function modelArgs(): string[] {
   const model = process.env.AI_CLAUDE_MODEL?.trim();

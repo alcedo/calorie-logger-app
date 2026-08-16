@@ -55,6 +55,16 @@ export type AiSelection = "auto" | ProviderId | "none";
 
 export type BannerKind = "ok" | "none" | "api_key";
 
+export interface AiLoginSessionDto {
+  sessionId: string;
+  provider: "claude" | "codex";
+  loginUrl: string;
+  userCode?: string;
+  expiresAt: number;
+  phase: "awaiting_user" | "completing" | "done" | "failed";
+  error?: string;
+}
+
 export interface AiProviderStatusDto {
   id: ProviderId;
   available: boolean;
@@ -72,4 +82,5 @@ export interface AiStatusDto {
   providers: AiProviderStatusDto[];
   bannerKind: BannerKind;
   bannerMessage: string | null;
+  logins: AiLoginSessionDto[];
 }

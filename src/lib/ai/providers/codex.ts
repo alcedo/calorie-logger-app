@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { codexChildEnv } from "../env";
+import { codexBin, codexChildEnv } from "../env";
 import {
   CliError,
   PROBE_TIMEOUT_MS,
@@ -14,10 +14,6 @@ import type {
   GenerateJsonRequest,
   ProviderAvailability,
 } from "../types";
-
-function codexBin(): string {
-  return process.env.AI_CODEX_BIN || "codex";
-}
 
 function modelArgs(): string[] {
   const model = process.env.AI_CODEX_MODEL?.trim();

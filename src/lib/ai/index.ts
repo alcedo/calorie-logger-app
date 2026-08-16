@@ -8,6 +8,11 @@ import {
   NUTRITION_SYSTEM,
 } from "./schemas";
 import { hasStrayAnthropicKey } from "./env";
+import { activeLogins } from "./login";
+import {
+  getSetting,
+  SETTING_AI_PROVIDER,
+} from "../settings";
 import type {
   AiNutrition,
   AiProvider,
@@ -22,6 +27,7 @@ import type {
 import { AiUnavailableError } from "./types";
 
 export type {
+  AiLoginSessionDto,
   AiNutrition,
   AiProvider,
   AiProviderStatusDto,
@@ -37,6 +43,10 @@ export {
   interpretClaudeAuthStatus,
   interpretClaudePrintResult,
 } from "./claude-parse";
+export {
+  parseClaudeLoginOutput,
+  parseCodexDeviceAuthOutput,
+} from "./login-parse";
 
 const PROVIDERS: Record<ProviderId, AiProvider> = {
   claude: claudeProvider,
@@ -48,15 +58,21 @@ const AUTO_ORDER: ProviderId[] = ["claude", "codex"];
 const STATUS_TTL_MS = 30_000;
 
 const NONE_BANNER =
-  "AI is not configured. Sign in with `claude auth login` (or `codex login`). Known foods still log; unknown foods can't be looked up. `OPENAI_API_KEY` is a paid opt-in — set `AI_PROVIDER=openai` to use it.";
+  "AI is not configured. Connect Claude or ChatGPT on the AI page to look up unknown foods.";
 
 const API_KEY_BANNER =
-  "Claude Code would bill an API key instead of your subscription. Unset `ANTHROPIC_API_KEY` (and `ANTHROPIC_AUTH_TOKEN`), then run `claude auth login`.";
+  "Claude Code would bill an API key instead of your subscription. Unset `ANTHROPIC_API_KEY` (and `ANTHROPIC_AUTH_TOKEN`), then connect Claude from the AI page.";
 
 let statusCache: { at: number; value: AiStatusDto } | null = null;
 
 function readSelection(): AiSelection | "invalid" {
-  const raw = (process.env.AI_PROVIDER ?? "auto").trim().toLowerCase();
+  const raw = (
+    process.env.AI_PROVIDER ||
+    getSetting(SETTING_AI_PROVIDER) ||
+    "auto"
+  )
+    .trim()
+    .toLowerCase();
   if (!raw || raw === "auto") return "auto";
   if (raw === "none" || raw === "claude" || raw === "codex" || raw === "openai") {
     return raw;
@@ -174,6 +190,7 @@ export async function getAiStatus(): Promise<AiStatusDto> {
     providers,
     bannerKind,
     bannerMessage,
+    logins: activeLogins(),
   };
   statusCache = { at: now, value };
   return value;

@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import { SEED_FOODS } from "./seed-data";
-import { normalizeFoodName } from "@/lib/normalize";
+import { normalizeFoodName } from "../lib/normalize";
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS foods (
@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS goals (
   protein REAL NOT NULL DEFAULT 120,
   carbs REAL NOT NULL DEFAULT 225,
   fat REAL NOT NULL DEFAULT 65
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 `;
 

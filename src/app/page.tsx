@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { MacroDashboard } from "@/components/MacroDashboard";
 import { EntryList } from "@/components/EntryList";
@@ -112,28 +113,25 @@ export default function TodayPage() {
   return (
     <div className="flex flex-1 flex-col gap-6">
       {aiStatus?.bannerKind === "api_key" && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">
-          {aiStatus.bannerMessage ?? (
-            <>
-              Claude Code would bill an API key instead of your subscription.
-              Unset <code>ANTHROPIC_API_KEY</code>, then run{" "}
-              <code>claude auth login</code>.
-            </>
-          )}
-        </div>
+        <Link
+          href="/ai"
+          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200"
+        >
+          {aiStatus.bannerMessage ??
+            "Claude would bill an API key. Open AI settings to connect your subscription."}{" "}
+          <span className="underline">Open AI settings</span>
+        </Link>
       )}
 
       {aiStatus?.bannerKind === "none" && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
-          {aiStatus.bannerMessage ?? (
-            <>
-              AI is not configured. Sign in with <code>claude auth login</code>{" "}
-              (or <code>codex login</code>). Known foods still log; unknown
-              foods can&apos;t be looked up. <code>OPENAI_API_KEY</code> is a
-              paid opt-in.
-            </>
-          )}
-        </div>
+        <Link
+          href="/ai"
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300"
+        >
+          {aiStatus.bannerMessage ??
+            "AI is not configured. Connect Claude or ChatGPT to look up unknown foods."}{" "}
+          <span className="underline">Connect AI</span>
+        </Link>
       )}
 
       {aiStatus?.bannerKind === "ok" && aiStatus.providerLabel && (

@@ -35,6 +35,8 @@ Open http://localhost:3000. The SQLite database is created and seeded automatica
 
 Without a signed-in CLI, the app still works for foods already in the database (a simple built-in parser handles inputs like "2 eggs and 200g chicken breast"), but unknown foods can't be looked up.
 
+Open **AI** in the app to connect a Claude or ChatGPT subscription from your phone: Claude shows a login link plus a code to paste; ChatGPT uses Codex device-auth (open the page, type the one-time code). No API keys.
+
 ### Claude subscription (default)
 
 Install [Claude Code](https://code.claude.com) and run `claude auth login`. The app shells out to `claude -p` using that login. Usage counts against your normal Pro/Max limits, shared with claude.ai and interactive Claude Code.
