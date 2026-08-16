@@ -10,6 +10,7 @@ import {
   type GoalsDto,
   type MacroTotalsDto,
 } from "@/lib/types";
+import type { AiStatusDto } from "@/lib/ai/types";
 
 interface ChatMessage {
   id: number;
@@ -32,7 +33,7 @@ export default function TodayPage() {
   const [goals, setGoals] = useState<GoalsDto | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
-  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiStatus, setAiStatus] = useState<AiStatusDto | null>(null);
 
   const refresh = useCallback(() => {
     return fetch(`/api/entries?date=${todayLocalDate()}`)
@@ -48,8 +49,8 @@ export default function TodayPage() {
     refresh();
     fetch("/api/status")
       .then((r) => r.json())
-      .then((d) => setAiAvailable(d.aiAvailable))
-      .catch(() => setAiAvailable(null));
+      .then((d: AiStatusDto) => setAiStatus(d))
+      .catch(() => setAiStatus(null));
   }, [refresh]);
 
   function pushMessage(msg: Omit<ChatMessage, "id">) {
@@ -110,12 +111,35 @@ export default function TodayPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      {aiAvailable === false && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
-          AI is not configured (missing <code>OPENAI_API_KEY</code>). Known
-          foods still log fine; unknown foods can&apos;t be looked up until a
-          key is set.
+      {aiStatus?.bannerKind === "api_key" && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">
+          {aiStatus.bannerMessage ?? (
+            <>
+              Claude Code would bill an API key instead of your subscription.
+              Unset <code>ANTHROPIC_API_KEY</code>, then run{" "}
+              <code>claude auth login</code>.
+            </>
+          )}
         </div>
+      )}
+
+      {aiStatus?.bannerKind === "none" && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+          {aiStatus.bannerMessage ?? (
+            <>
+              AI is not configured. Sign in with <code>claude auth login</code>{" "}
+              (or <code>codex login</code>). Known foods still log; unknown
+              foods can&apos;t be looked up. <code>OPENAI_API_KEY</code> is a
+              paid opt-in.
+            </>
+          )}
+        </div>
+      )}
+
+      {aiStatus?.bannerKind === "ok" && aiStatus.providerLabel && (
+        <p className="text-[11px] text-zinc-500">
+          AI: {aiStatus.providerLabel}
+        </p>
       )}
 
       {totals && goals && <MacroDashboard totals={totals} goals={goals} />}
