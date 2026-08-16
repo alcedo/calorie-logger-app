@@ -32,6 +32,16 @@ Open http://localhost:3000. The SQLite database is created and seeded automatica
 
 Without an `OPENAI_API_KEY`, the app still works for foods already in the database (a simple built-in parser handles inputs like "2 eggs and 200g chicken breast"), but unknown foods can't be looked up.
 
+## Testing
+
+```bash
+npm test          # Vitest unit + API/DB integration suite
+npm run test:watch
+npm run test:e2e  # Playwright (Today / History / Foods flows)
+```
+
+Unit tests cover parsing, normalization, unit conversion, and components. Integration tests use an isolated temp SQLite file (`CALORIE_LOGGER_DB_PATH` / `resetDbForTests`) so they never touch `data/app.db`. OpenAI is mocked; no network calls. Playwright boots `next dev` against a temp DB with AI disabled.
+
 ## Tech stack
 
 - Next.js 16 (App Router, TypeScript) — UI and API routes in one codebase
