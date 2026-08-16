@@ -111,6 +111,16 @@ async function fixtureChecks() {
   }
   pass("Claude login URL parsed");
 
+  const oscUrl =
+    "https://claude.com/cai/oauth/authorize?code=true&client_id=abc&state=xyz";
+  const claudeOsc = parseClaudeLoginOutput(
+    `Opening browser to sign in…\nIf the browser didn't open, visit: \x1b]8;;${oscUrl}\x07${oscUrl}\x1b]8;;\x07\nPaste code here if prompted >`,
+  );
+  if (claudeOsc?.loginUrl !== oscUrl) {
+    fail(`OSC-8 Claude URL: ${claudeOsc?.loginUrl}`);
+  }
+  pass("Claude login URL parsed from OSC-8 hyperlink");
+
   const codexDev = parseCodexDeviceAuthOutput(
     [
       "Follow these steps to sign in with ChatGPT using device code authorization:",
@@ -127,6 +137,23 @@ async function fixtureChecks() {
     fail(`codex code: ${codexDev?.userCode}`);
   }
   pass("Codex device-auth URL and code parsed");
+
+  const codexOsc = parseCodexDeviceAuthOutput(
+    [
+      "Follow these steps to sign in with ChatGPT using device code authorization:",
+      "1. Open this link in your browser and sign in to your account",
+      `   \x1b]8;;https://auth.openai.com/codex/device\x07https://auth.openai.com/codex/device\x1b]8;;\x07`,
+      "2. Enter this one-time code (expires in 15 minutes)\r",
+      "   UCSZ-GZ4P1\r",
+    ].join("\n"),
+  );
+  if (codexOsc?.loginUrl !== "https://auth.openai.com/codex/device") {
+    fail(`codex OSC url: ${codexOsc?.loginUrl}`);
+  }
+  if (codexOsc?.userCode !== "UCSZ-GZ4P1") {
+    fail(`codex CR code: ${codexOsc?.userCode}`);
+  }
+  pass("Codex device-auth parsed from OSC-8 and CR output");
 }
 
 async function liveChecks() {

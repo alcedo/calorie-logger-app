@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { getSetting, SETTING_CLAUDE_OAUTH_TOKEN } from "../settings";
@@ -9,6 +10,10 @@ import { getSetting, SETTING_CLAUDE_OAUTH_TOKEN } from "../settings";
  * then drop credentials that would silently switch billing to an API key.
  * CLAUDE_CODE_OAUTH_TOKEN is deleted and re-added only when configured so
  * one code path owns which credential the CLI sees.
+ *
+ * TERM is forced to `dumb` because Claude Code emits OSC-8 hyperlinks when
+ * TERM looks capable (e.g. tmux-256color from `next start` in tmux), even
+ * if stdout is a pipe. Those sequences break naive "visit: https://" parsers.
  */
 
 function withLocalBin(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -28,21 +33,49 @@ function dropScratchHomes(env: NodeJS.ProcessEnv): void {
   }
 }
 
+const DROP_HOST_KEYS = [
+  "DISPLAY",
+  "CURSOR_AGENT",
+  "CURSOR_AGENT_SOCKET",
+  "CURSOR_CONVERSATION_ID",
+  "CURSOR_RIPGREP_PATH",
+  "AGENT_TRANSCRIPTS",
+  "EXEC_DAEMON_STARTUP_TRACEPARENT",
+  "TMUX",
+  "TMUX_PANE",
+] as const;
+
+function sanitizeHostEnv(env: NodeJS.ProcessEnv): void {
+  for (const key of DROP_HOST_KEYS) delete env[key];
+  env.TERM = "dumb";
+  env.NO_COLOR = "1";
+  env.FORCE_COLOR = "0";
+  env.COLOR = "0";
+  env.BROWSER = "true";
+}
+
+function resolveBin(name: string, override: string | undefined): string {
+  const trimmed = override?.trim();
+  if (trimmed) return trimmed;
+  const local = join(homedir(), ".local", "bin", name);
+  if (existsSync(local)) return local;
+  return name;
+}
+
 export function claudeBin(): string {
-  return process.env.AI_CLAUDE_BIN || "claude";
+  return resolveBin("claude", process.env.AI_CLAUDE_BIN);
 }
 
 export function codexBin(): string {
-  return process.env.AI_CODEX_BIN || "codex";
+  return resolveBin("codex", process.env.AI_CODEX_BIN);
 }
 
 export function claudeChildEnv(): NodeJS.ProcessEnv {
   const env = withLocalBin({ ...process.env });
   dropScratchHomes(env);
+  sanitizeHostEnv(env);
   delete env.ANTHROPIC_API_KEY;
   delete env.ANTHROPIC_AUTH_TOKEN;
-  delete env.DISPLAY;
-  env.BROWSER = "true";
   const token =
     process.env.CLAUDE_CODE_OAUTH_TOKEN ||
     getSetting(SETTING_CLAUDE_OAUTH_TOKEN);
@@ -54,10 +87,9 @@ export function claudeChildEnv(): NodeJS.ProcessEnv {
 export function codexChildEnv(): NodeJS.ProcessEnv {
   const env = withLocalBin({ ...process.env });
   dropScratchHomes(env);
+  sanitizeHostEnv(env);
   delete env.OPENAI_API_KEY;
   delete env.CODEX_API_KEY;
-  delete env.DISPLAY;
-  env.BROWSER = "true";
   return env;
 }
 

@@ -35,19 +35,23 @@ function store(): Store {
   return g.__macroAiLogins;
 }
 
-function killSession(session: LoginSession) {
+function killChild(child: ChildProcess) {
   try {
-    session.child.kill("SIGTERM");
+    child.kill("SIGTERM");
   } catch {
     /* already gone */
   }
   setTimeout(() => {
     try {
-      session.child.kill("SIGKILL");
+      child.kill("SIGKILL");
     } catch {
       /* ignore */
     }
   }, 1500).unref();
+}
+
+function killSession(session: LoginSession) {
+  killChild(session.child);
 }
 
 function cancelProvider(provider: LoginKind) {
@@ -71,6 +75,8 @@ function attach(child: ChildProcess): {
   };
   child.stdout?.on("data", onChunk);
   child.stderr?.on("data", onChunk);
+  child.stdout?.resume();
+  child.stderr?.resume();
   const closed = new Promise<number | null>((resolve) => {
     child.on("close", (code) => resolve(code));
     child.on("error", () => resolve(null));
@@ -98,7 +104,14 @@ function waitFor(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error("Timed out waiting for the login URL. Is the CLI installed?"));
+      const snippet = sessionBuf.current.trim().slice(0, 400);
+      reject(
+        new Error(
+          snippet
+            ? `Timed out waiting for the login URL.\n${snippet}`
+            : "Timed out waiting for the login URL. Is the CLI installed?",
+        ),
+      );
     }, timeoutMs);
 
     const check = () => {
@@ -135,13 +148,40 @@ function waitFor(
   });
 }
 
+async function spawnUntilParsed(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  parse: (text: string) => unknown,
+): Promise<{
+  child: ChildProcess;
+  sessionBuf: { current: string };
+  closed: Promise<number | null>;
+}> {
+  const child = spawnLogin(command, args, env);
+  const { sessionBuf, closed } = attach(child);
+  try {
+    await waitFor(sessionBuf, child, parse, START_WAIT_MS);
+  } catch (err) {
+    killChild(child);
+    throw err;
+  }
+  return { child, sessionBuf, closed };
+}
+
 export async function startClaudeLogin(): Promise<LoginSessionPublic> {
   cancelProvider("claude");
-  const child = spawnLogin(claudeBin(), ["auth", "login", "--claudeai"], claudeChildEnv());
-  const { sessionBuf, closed } = attach(child);
-  await waitFor(sessionBuf, child, parseClaudeLoginOutput, START_WAIT_MS);
+  const { child, sessionBuf, closed } = await spawnUntilParsed(
+    claudeBin(),
+    ["auth", "login", "--claudeai"],
+    claudeChildEnv(),
+    parseClaudeLoginOutput,
+  );
   const parsed = parseClaudeLoginOutput(sessionBuf.current);
-  if (!parsed) throw new Error("Claude login did not print a URL");
+  if (!parsed) {
+    killChild(child);
+    throw new Error("Claude login did not print a URL");
+  }
 
   const sessionId = randomUUID();
   const session: LoginSession = {
@@ -222,11 +262,17 @@ export async function completeClaudeLogin(
 
 export async function startCodexLogin(): Promise<LoginSessionPublic> {
   cancelProvider("codex");
-  const child = spawnLogin(codexBin(), ["login", "--device-auth"], codexChildEnv());
-  const { sessionBuf, closed } = attach(child);
-  await waitFor(sessionBuf, child, parseCodexDeviceAuthOutput, START_WAIT_MS);
+  const { child, sessionBuf, closed } = await spawnUntilParsed(
+    codexBin(),
+    ["login", "--device-auth"],
+    codexChildEnv(),
+    parseCodexDeviceAuthOutput,
+  );
   const parsed = parseCodexDeviceAuthOutput(sessionBuf.current);
-  if (!parsed) throw new Error("Codex login did not print a device code");
+  if (!parsed) {
+    killChild(child);
+    throw new Error("Codex login did not print a device code");
+  }
 
   const sessionId = randomUUID();
   const session: LoginSession = {
