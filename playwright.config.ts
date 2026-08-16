@@ -31,6 +31,8 @@ export default defineConfig({
       CALORIE_LOGGER_DB_PATH: e2eDb,
       OPENAI_API_KEY: "",
       AI_PROVIDER: "none",
+      AI_CLAUDE_BIN: "/no/such/macro-claude-binary",
+      AI_CODEX_BIN: "/no/such/macro-codex-binary",
     },
   },
 });

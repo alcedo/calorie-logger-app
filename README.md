@@ -39,6 +39,8 @@ Without a signed-in CLI, the app still works for foods already in the database (
 
 Open **AI** in the app to connect a Claude or ChatGPT subscription from your phone: Claude shows a login link plus a code to paste; ChatGPT uses Codex device-auth (open the page, type the one-time code). No API keys.
 
+The Claude Code and Codex CLIs must be installed **on the computer that runs this app** (the Next.js server), not on your phone. If a CLI is missing, Connect is disabled and the page explains how to install it. `POST /api/ai` `{ action: "connect" }` also refuses to spawn a missing binary.
+
 ### Claude subscription (default)
 
 Install [Claude Code](https://code.claude.com) and run `claude auth login`. The app shells out to `claude -p` using that login. Usage counts against your normal Pro/Max limits, shared with claude.ai and interactive Claude Code.

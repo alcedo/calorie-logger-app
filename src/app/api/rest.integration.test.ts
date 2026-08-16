@@ -207,8 +207,17 @@ describe("history and status APIs", () => {
     clearAiStatusCache();
 
     const { GET } = await import("@/app/api/status/route");
-    const off = await readJson<{ aiAvailable: boolean }>(await GET());
+    const off = await readJson<{
+      aiAvailable: boolean;
+      providers: Array<{ id: string; cliInstalled?: boolean }>;
+    }>(await GET());
     expect(off.body.aiAvailable).toBe(false);
+    expect(off.body.providers.find((p) => p.id === "claude")?.cliInstalled).toBe(
+      false,
+    );
+    expect(off.body.providers.find((p) => p.id === "codex")?.cliInstalled).toBe(
+      false,
+    );
 
     process.env.OPENAI_API_KEY = "x";
     clearAiStatusCache();

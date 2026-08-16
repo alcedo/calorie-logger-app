@@ -35,6 +35,12 @@ export interface ProviderAvailability {
   reason?: ProviderReason;
   subscriptionType?: string | null;
   authMethod?: string;
+  /**
+   * CLI subscription providers only. False when the binary is not on PATH
+   * (Connect must not spawn). True when the CLI ran, even if the user is
+   * logged out. Omit for OpenAI (no CLI).
+   */
+  cliInstalled?: boolean;
 }
 
 export interface GenerateJsonRequest {
@@ -79,6 +85,7 @@ export interface AiProviderStatusDto {
   reason?: ProviderReason;
   subscriptionType?: string | null;
   authMethod?: string;
+  cliInstalled?: boolean;
 }
 
 export interface AiStatusDto {

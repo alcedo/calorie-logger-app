@@ -8,7 +8,11 @@ import {
   CODEX_LOGOUT_ARGS,
 } from "./cli-args";
 import { parseClaudeLoginOutput, parseCodexDeviceAuthOutput } from "./login-parse";
-import { isCliNotFound, cliNotFoundMessage } from "./run-cli";
+import {
+  isCliNotFound,
+  cliNotFoundMessage,
+  requireCliInstalled,
+} from "./run-cli";
 
 export type LoginKind = "claude" | "codex";
 
@@ -173,6 +177,7 @@ async function spawnUntilParsed(
   sessionBuf: { current: string };
   closed: Promise<number | null>;
 }> {
+  requireCliInstalled(command, env);
   const child = spawnLogin(command, args, env);
   const { sessionBuf, closed } = attach(child);
   try {

@@ -115,6 +115,7 @@ function toDto(
     reason: avail.reason,
     subscriptionType: avail.subscriptionType,
     authMethod: avail.authMethod,
+    cliInstalled: avail.cliInstalled,
   };
 }
 

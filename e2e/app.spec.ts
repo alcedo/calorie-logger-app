@@ -33,6 +33,12 @@ test("AI page: provider and model pickers", async ({ page }) => {
   await expect(page.getByLabel("AI provider")).toBeVisible();
   await expect(page.getByLabel("claude model")).toBeVisible();
   await expect(page.getByLabel("codex model")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect Claude" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Connect ChatGPT" })).toBeDisabled();
+  await expect(page.getByText("CLI not installed").first()).toBeVisible();
+  await expect(
+    page.getByText(/Install the CLI on that computer/i),
+  ).toBeVisible();
 });
 
 test("History: expand day loads entries", async ({ page }) => {
