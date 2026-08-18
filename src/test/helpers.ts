@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { NextRequest } from "next/server";
-import { afterAll, beforeEach } from "vitest";
+import { afterAll, beforeAll, beforeEach } from "vitest";
 import {
   clearEntriesForTests,
   resetDbForTests,
@@ -13,28 +13,25 @@ export function setupTempDatabase(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "calorie-logger-"));
   const dbPath = path.join(dir, "test.db");
 
-  resetDbForTests(dbPath);
+  beforeAll(async () => {
+    await resetDbForTests(dbPath);
+  });
 
-  beforeEach(() => {
-    clearEntriesForTests();
-    // Remove any user/ai foods added during prior tests; keep seeds
-    const sqlite = globalThis.__calorieLoggerSqlite;
-    if (sqlite) {
-      sqlite.prepare("DELETE FROM foods WHERE source != 'seed'").run();
-    }
+  beforeEach(async () => {
+    await clearEntriesForTests();
   });
 
   afterAll(() => {
-    const sqlite = globalThis.__calorieLoggerSqlite;
-    if (sqlite) {
+    if (globalThis.__calorieLoggerClient) {
       try {
-        sqlite.close();
+        globalThis.__calorieLoggerClient.close();
       } catch {
         // ignore
       }
     }
-    globalThis.__calorieLoggerSqlite = undefined;
+    globalThis.__calorieLoggerClient = undefined;
     globalThis.__calorieLoggerDb = undefined;
+    globalThis.__calorieLoggerReady = undefined;
     for (const suffix of ["", "-wal", "-shm"]) {
       try {
         fs.unlinkSync(dbPath + suffix);

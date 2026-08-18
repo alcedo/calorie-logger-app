@@ -19,6 +19,7 @@ These encode product requirements. Deleting, skipping, or weakening them is BLOC
 - `src/lib/types.test.ts` — `todayLocalDate` is local calendar date, not UTC (midnight timezone bugs)
 - `src/lib/units.test.ts` — gram/kg/oz serving math and macro rounding
 - `src/db/index.integration.test.ts` — SQLite schema and seed behavior against a temp DB (`setupTempDatabase`)
+- `src/db/config.test.ts` — Turso URL vs local file; Vercel requires `TURSO_DATABASE_URL`
 - `src/lib/ai/select.ts` `AUTO_ORDER` — must stay `claude` then `codex`; openai is opt-in only
 - `POST /api/log` JSON (`logged` / `unresolved` / `usedAiParser`) is still the API/test contract; the Today UI logs via SSE (`?stream=1` + `Accept: text/event-stream`)
 
@@ -28,6 +29,7 @@ These encode product requirements. Deleting, skipping, or weakening them is BLOC
 - `AI_PROVIDER=auto` must not pick OpenAI even if `OPENAI_API_KEY` is set.
 - Next.js in this repo has breaking APIs vs training data; check `node_modules/next/dist/docs/` before treating App Router / config changes as equivalent to older Next.
 - Integration tests use a temp SQLite DB, not `data/app.db`. Don't treat a missing `data/app.db` as a test failure.
+- On Vercel the DB is remote libSQL/Turso (`TURSO_DATABASE_URL`); file SQLite is only for local/dev/tests. `better-sqlite3` is gone.
 - Meal persist logic lives in `src/lib/log-meal.ts` (not only `src/app/api/log/route.ts`). Mocking `@/lib/ai` still works for log tests because `log-meal` imports those symbols.
 - `lookupNutrition` always calls `searchNutritionWeb` (USDA / Open Food Facts / DuckDuckGo) before the LLM. `src/lib/ai.test.ts` mocks `@/lib/nutrition-search`; CI never hits those APIs.
 - Parse/nutrition JSON schemas now require `reasoning` (nutrition also `sources`). Live CLI structured-output is not in CI.

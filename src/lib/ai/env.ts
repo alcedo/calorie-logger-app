@@ -70,7 +70,7 @@ export function codexBin(): string {
   return resolveBin("codex", process.env.AI_CODEX_BIN);
 }
 
-export function claudeChildEnv(): NodeJS.ProcessEnv {
+export async function claudeChildEnv(): Promise<NodeJS.ProcessEnv> {
   const env = withLocalBin({ ...process.env });
   dropScratchHomes(env);
   sanitizeHostEnv(env);
@@ -78,7 +78,7 @@ export function claudeChildEnv(): NodeJS.ProcessEnv {
   delete env.ANTHROPIC_AUTH_TOKEN;
   let stored: string | undefined;
   try {
-    stored = getSetting(SETTING_CLAUDE_OAUTH_TOKEN);
+    stored = await getSetting(SETTING_CLAUDE_OAUTH_TOKEN);
   } catch {
     stored = undefined;
   }

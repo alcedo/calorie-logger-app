@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { foods } from "@/db/schema";
 import { like, asc } from "drizzle-orm";
 import { cacheFood } from "@/lib/food-lookup";
 import { normalizeFoodName } from "@/lib/normalize";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function GET(req: NextRequest) {
+  await ensureDb();
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const rows = q
-    ? db
+    ? await db
         .select()
         .from(foods)
         .where(like(foods.normalizedName, `%${normalizeFoodName(q)}%`))
         .orderBy(asc(foods.name))
         .all()
-    : db.select().from(foods).orderBy(asc(foods.name)).all();
+    : await db.select().from(foods).orderBy(asc(foods.name)).all();
   return NextResponse.json({ foods: rows });
 }
 
@@ -26,7 +30,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const food = cacheFood({
+  const food = await cacheFood({
     name: String(body.name),
     aliases: Array.isArray(body.aliases) ? body.aliases.map(String) : [],
     servingSize: Number(body.servingSize) || 1,

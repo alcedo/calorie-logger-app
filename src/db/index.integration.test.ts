@@ -12,16 +12,16 @@ describe("createDb / seed idempotency", () => {
   const dbPath = path.join(dir, "seed.db");
 
   afterAll(() => {
-    const sqlite = globalThis.__calorieLoggerSqlite;
-    if (sqlite) {
+    if (globalThis.__calorieLoggerClient) {
       try {
-        sqlite.close();
+        globalThis.__calorieLoggerClient.close();
       } catch {
         // ignore
       }
     }
-    globalThis.__calorieLoggerSqlite = undefined;
+    globalThis.__calorieLoggerClient = undefined;
     globalThis.__calorieLoggerDb = undefined;
+    globalThis.__calorieLoggerReady = undefined;
     for (const suffix of ["", "-wal", "-shm"]) {
       try {
         fs.unlinkSync(dbPath + suffix);
@@ -36,11 +36,11 @@ describe("createDb / seed idempotency", () => {
     }
   });
 
-  it("seeds foods and default goals on first create", () => {
-    resetDbForTests(dbPath);
-    const count = db.select().from(foods).all().length;
+  it("seeds foods and default goals on first create", async () => {
+    await resetDbForTests(dbPath);
+    const count = (await db.select().from(foods).all()).length;
     expect(count).toBe(SEED_FOODS.length);
-    const g = db.select().from(goals).where(eq(goals.id, 1)).get();
+    const g = await db.select().from(goals).where(eq(goals.id, 1)).get();
     expect(g).toMatchObject({
       calories: 2000,
       protein: 120,
@@ -49,11 +49,10 @@ describe("createDb / seed idempotency", () => {
     });
   });
 
-  it("does not duplicate foods when reopening the same file", () => {
-    const before = db.select().from(foods).all().length;
-    // Re-open same path (simulates second process / re-import)
-    resetDbForTests(dbPath);
-    const after = db.select().from(foods).all().length;
+  it("does not duplicate foods when reopening the same file", async () => {
+    const before = (await db.select().from(foods).all()).length;
+    await resetDbForTests(dbPath);
+    const after = (await db.select().from(foods).all()).length;
     expect(after).toBe(before);
     expect(after).toBe(SEED_FOODS.length);
   });

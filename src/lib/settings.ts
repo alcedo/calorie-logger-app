@@ -1,4 +1,4 @@
-import { db } from "../db";
+import { db, ensureDb } from "../db";
 import { settings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -8,13 +8,20 @@ export const SETTING_AI_CLAUDE_MODEL = "ai_claude_model";
 export const SETTING_AI_CODEX_MODEL = "ai_codex_model";
 export const SETTING_AI_OPENAI_MODEL = "ai_openai_model";
 
-export function getSetting(key: string): string | undefined {
-  const row = db.select().from(settings).where(eq(settings.key, key)).get();
+export async function getSetting(key: string): Promise<string | undefined> {
+  await ensureDb();
+  const row = await db
+    .select()
+    .from(settings)
+    .where(eq(settings.key, key))
+    .get();
   return row?.value;
 }
 
-export function setSetting(key: string, value: string): void {
-  db.insert(settings)
+export async function setSetting(key: string, value: string): Promise<void> {
+  await ensureDb();
+  await db
+    .insert(settings)
     .values({ key, value })
     .onConflictDoUpdate({
       target: settings.key,
@@ -23,6 +30,7 @@ export function setSetting(key: string, value: string): void {
     .run();
 }
 
-export function deleteSetting(key: string): void {
-  db.delete(settings).where(eq(settings.key, key)).run();
+export async function deleteSetting(key: string): Promise<void> {
+  await ensureDb();
+  await db.delete(settings).where(eq(settings.key, key)).run();
 }

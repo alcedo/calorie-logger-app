@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { goals } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function GET() {
-  const row = db.select().from(goals).where(eq(goals.id, 1)).get();
+  await ensureDb();
+  const row = await db.select().from(goals).where(eq(goals.id, 1)).get();
   return NextResponse.json({ goals: row });
 }
 
 export async function PUT(req: NextRequest) {
+  await ensureDb();
   const body = await req.json().catch(() => null);
   const fields = ["calories", "protein", "carbs", "fat"] as const;
   const updates: Record<string, number> = {};
@@ -19,7 +24,7 @@ export async function PUT(req: NextRequest) {
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
-  const updated = db
+  const updated = await db
     .update(goals)
     .set(updates)
     .where(eq(goals.id, 1))

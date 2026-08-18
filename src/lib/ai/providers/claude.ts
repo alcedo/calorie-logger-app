@@ -20,13 +20,22 @@ import type {
   GenerateJsonRequest,
   ProviderAvailability,
 } from "../types";
+import { isServerlessHost, SERVERLESS_CLI_DETAIL } from "../../runtime";
 
 export const claudeProvider: AiProvider = {
   id: "claude",
   label: "Claude Code (subscription)",
 
   async isAvailable(): Promise<ProviderAvailability> {
-    const env = claudeChildEnv();
+    if (isServerlessHost()) {
+      return {
+        available: false,
+        detail: SERVERLESS_CLI_DETAIL,
+        reason: "serverless",
+        cliInstalled: false,
+      };
+    }
+    const env = await claudeChildEnv();
     const command = claudeBin();
     if (!cliIsInstalled(command, env)) {
       return {
@@ -82,7 +91,10 @@ export const claudeProvider: AiProvider = {
   },
 
   async generateJson<T>(req: GenerateJsonRequest): Promise<T> {
-    const env = claudeChildEnv();
+    if (isServerlessHost()) {
+      throw new Error(SERVERLESS_CLI_DETAIL);
+    }
+    const env = await claudeChildEnv();
     const cwd = await mkdtemp(join(tmpdir(), "macro-claude-"));
     try {
       const result = await runCli({

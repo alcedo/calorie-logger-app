@@ -54,18 +54,18 @@ describe("model catalog", () => {
 });
 
 describe("resolveModelFor", () => {
-  it("falls back to gpt-4o-mini for OpenAI", () => {
+  it("falls back to gpt-4o-mini for OpenAI", async () => {
     const prev = process.env.OPENAI_MODEL;
     delete process.env.OPENAI_MODEL;
-    expect(resolveModelFor("openai")).toBe("gpt-4o-mini");
+    expect(await resolveModelFor("openai")).toBe("gpt-4o-mini");
     if (prev === undefined) delete process.env.OPENAI_MODEL;
     else process.env.OPENAI_MODEL = prev;
   });
 
-  it("reads env when no setting is stored", () => {
+  it("reads env when no setting is stored", async () => {
     const prev = process.env.AI_CLAUDE_MODEL;
     process.env.AI_CLAUDE_MODEL = "opus";
-    expect(resolveModelFor("claude")).toBe("opus");
+    expect(await resolveModelFor("claude")).toBe("opus");
     if (prev === undefined) delete process.env.AI_CLAUDE_MODEL;
     else process.env.AI_CLAUDE_MODEL = prev;
   });

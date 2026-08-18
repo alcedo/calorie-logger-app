@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { createClient, type Client } from "@libsql/client";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
+import { eq, ne, sql } from "drizzle-orm";
 import * as schema from "./schema";
+import { entries, foods, goals, settings } from "./schema";
 import { SEED_FOODS } from "./seed-data";
 import { normalizeFoodName } from "../lib/normalize";
+import { resolveDatabaseConfig } from "./config";
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS foods (
@@ -59,57 +62,64 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 `;
 
-export type DrizzleDb = BetterSQLite3Database<typeof schema>;
+export type DrizzleDb = LibSQLDatabase<typeof schema>;
 
 declare global {
   var __calorieLoggerDb: DrizzleDb | undefined;
-  var __calorieLoggerSqlite: Database.Database | undefined;
+  var __calorieLoggerClient: Client | undefined;
+  var __calorieLoggerReady: Promise<void> | undefined;
 }
 
-function resolveDbPath(dbFilePath?: string): string {
-  if (dbFilePath) return dbFilePath;
-  if (process.env.CALORIE_LOGGER_DB_PATH) {
-    return process.env.CALORIE_LOGGER_DB_PATH;
+function createHandle(dbFilePath?: string): { client: Client; db: DrizzleDb } {
+  const config = resolveDatabaseConfig({ dbFilePath });
+  if (config.filePath) {
+    fs.mkdirSync(path.dirname(config.filePath), { recursive: true });
   }
-  return path.join(process.cwd(), "data", "app.db");
+  const client = createClient({
+    url: config.url,
+    authToken: config.authToken,
+    intMode: "number",
+  });
+  const db = drizzle(client, { schema });
+  return { client, db };
 }
 
-function createDb(dbFilePath?: string): DrizzleDb {
-  const filePath = resolveDbPath(dbFilePath);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const sqlite = new Database(filePath);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.exec(DDL);
-
-  // Ensure the single goals row exists
-  sqlite
-    .prepare(
-      "INSERT INTO goals (id, calories, protein, carbs, fat) VALUES (1, 2000, 120, 225, 65) ON CONFLICT(id) DO NOTHING"
-    )
-    .run();
-
-  // Seed common foods on first run
-  const { n } = sqlite.prepare("SELECT COUNT(*) AS n FROM foods").get() as {
-    n: number;
+function getHandle(dbFilePath?: string): { client: Client; db: DrizzleDb } {
+  if (!globalThis.__calorieLoggerDb || !globalThis.__calorieLoggerClient) {
+    const handle = createHandle(dbFilePath);
+    globalThis.__calorieLoggerClient = handle.client;
+    globalThis.__calorieLoggerDb = handle.db;
+  }
+  return {
+    client: globalThis.__calorieLoggerClient,
+    db: globalThis.__calorieLoggerDb,
   };
+}
+
+async function migrateAndSeed(client: Client, db: DrizzleDb): Promise<void> {
+  const config = resolveDatabaseConfig();
+  if (!config.remote) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await client.execute("PRAGMA journal_mode = WAL");
+  }
+  await client.executeMultiple(DDL);
+
+  await db
+    .insert(goals)
+    .values({ id: 1, calories: 2000, protein: 120, carbs: 225, fat: 65 })
+    .onConflictDoNothing();
+
+  const countRow = await db.select({ n: sql<number>`count(*)` }).from(foods);
+  const n = Number(countRow[0]?.n ?? 0);
   if (n === 0) {
-    const insert = sqlite.prepare(
-      `INSERT INTO foods
-        (name, normalized_name, aliases, serving_size, serving_unit,
-         calories, protein, carbs, fat, fiber, sugar, sodium, source)
-       VALUES
-        (@name, @normalizedName, @aliases, @servingSize, @servingUnit,
-         @calories, @protein, @carbs, @fat, @fiber, @sugar, @sodium, 'seed')
-       ON CONFLICT(normalized_name) DO NOTHING`
-    );
-    const seedAll = sqlite.transaction(() => {
-      for (const f of SEED_FOODS) {
-        insert.run({
+    await db
+      .insert(foods)
+      .values(
+        SEED_FOODS.map((f) => ({
           name: f.name,
           normalizedName: normalizeFoodName(f.name),
           aliases: JSON.stringify(
-            (f.aliases ?? []).map((a) => normalizeFoodName(a))
+            (f.aliases ?? []).map((a) => normalizeFoodName(a)),
           ),
           servingSize: f.servingSize,
           servingUnit: f.servingUnit,
@@ -120,21 +130,24 @@ function createDb(dbFilePath?: string): DrizzleDb {
           fiber: f.fiber ?? 0,
           sugar: f.sugar ?? 0,
           sodium: f.sodium ?? 0,
-        });
-      }
-    });
-    seedAll();
+          source: "seed" as const,
+        })),
+      )
+      .onConflictDoNothing();
   }
-
-  globalThis.__calorieLoggerSqlite = sqlite;
-  return drizzle(sqlite, { schema });
 }
 
-function getDb(): DrizzleDb {
-  if (!globalThis.__calorieLoggerDb) {
-    globalThis.__calorieLoggerDb = createDb();
+/**
+ * Open (or reuse) the libSQL client and apply schema + seed.
+ * Safe to call on every request; migrate/seed runs once per process.
+ */
+export async function ensureDb(): Promise<DrizzleDb> {
+  const { client, db } = getHandle();
+  if (!globalThis.__calorieLoggerReady) {
+    globalThis.__calorieLoggerReady = migrateAndSeed(client, db);
   }
-  return globalThis.__calorieLoggerDb;
+  await globalThis.__calorieLoggerReady;
+  return db;
 }
 
 /**
@@ -143,7 +156,7 @@ function getDb(): DrizzleDb {
  */
 export const db: DrizzleDb = new Proxy({} as DrizzleDb, {
   get(_target, prop, receiver) {
-    const instance = getDb() as unknown as object;
+    const instance = getHandle().db as unknown as object;
     const value = Reflect.get(instance, prop, receiver);
     return typeof value === "function"
       ? (value as (...args: unknown[]) => unknown).bind(instance)
@@ -152,31 +165,32 @@ export const db: DrizzleDb = new Proxy({} as DrizzleDb, {
 });
 
 /** Close any open connection and open a fresh DB at `dbFilePath` (tests only). */
-export function resetDbForTests(dbFilePath: string): DrizzleDb {
-  if (globalThis.__calorieLoggerSqlite) {
+export async function resetDbForTests(dbFilePath: string): Promise<DrizzleDb> {
+  if (globalThis.__calorieLoggerClient) {
     try {
-      globalThis.__calorieLoggerSqlite.close();
+      globalThis.__calorieLoggerClient.close();
     } catch {
       // already closed
     }
   }
-  globalThis.__calorieLoggerSqlite = undefined;
+  globalThis.__calorieLoggerClient = undefined;
   globalThis.__calorieLoggerDb = undefined;
+  globalThis.__calorieLoggerReady = undefined;
   process.env.CALORIE_LOGGER_DB_PATH = dbFilePath;
-  const instance = createDb(dbFilePath);
-  globalThis.__calorieLoggerDb = instance;
+  const { client, db: instance } = getHandle(dbFilePath);
+  globalThis.__calorieLoggerReady = migrateAndSeed(client, instance);
+  await globalThis.__calorieLoggerReady;
   return instance;
 }
 
 /** Drop entries and reset goals; keep seeded foods (tests only). */
-export function clearEntriesForTests(): void {
-  const sqlite = globalThis.__calorieLoggerSqlite;
-  if (!sqlite) return;
-  sqlite.exec("DELETE FROM entries");
-  sqlite.exec("DELETE FROM settings");
-  sqlite
-    .prepare(
-      "UPDATE goals SET calories = 2000, protein = 120, carbs = 225, fat = 65 WHERE id = 1"
-    )
-    .run();
+export async function clearEntriesForTests(): Promise<void> {
+  const instance = await ensureDb();
+  await instance.delete(entries);
+  await instance.delete(settings);
+  await instance
+    .update(goals)
+    .set({ calories: 2000, protein: 120, carbs: 225, fat: 65 })
+    .where(eq(goals.id, 1));
+  await instance.delete(foods).where(ne(foods.source, "seed"));
 }

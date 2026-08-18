@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { entries, type Entry, type Food } from "@/db/schema";
 import {
   getAiStatus,
@@ -113,8 +113,9 @@ export async function logMeal(input: LogMealInput): Promise<LogMealResult> {
     | { item: ParsedFoodItem; food: Food; source: "database" | "ai" }
     | { item: ParsedFoodItem; food: null; source: null };
 
-  const slots: Slot[] = items.map((item) => {
-    const food = findFood(item.name);
+  const slots: Slot[] = [];
+  for (const item of items) {
+    const food = await findFood(item.name);
     if (food) {
       emit({
         type: "step",
@@ -122,10 +123,11 @@ export async function logMeal(input: LogMealInput): Promise<LogMealResult> {
         title: `Matched “${item.name}” in the local database`,
         detail: `${food.name} · ${food.calories} kcal per ${food.servingSize} ${food.servingUnit}`,
       });
-      return { item, food, source: "database" as const };
+      slots.push({ item, food, source: "database" as const });
+    } else {
+      slots.push({ item, food: null, source: null });
     }
-    return { item, food: null, source: null };
-  });
+  }
 
   const missIndexes = slots
     .map((slot, i) => (slot.food ? -1 : i))
@@ -169,7 +171,7 @@ export async function logMeal(input: LogMealInput): Promise<LogMealResult> {
             });
             continue;
           }
-          const food = cacheFood({ ...nutrition, source: "ai" });
+          const food = await cacheFood({ ...nutrition, source: "ai" });
           emit({
             type: "step",
             id: `ai-${item.name}`,
@@ -199,7 +201,8 @@ export async function logMeal(input: LogMealInput): Promise<LogMealResult> {
     const servings = servingsFor(item.quantity, item.unit, food);
     const macros = macrosForServings(food, servings);
 
-    const entry = db
+    await ensureDb();
+    const entry = await db
       .insert(entries)
       .values({
         date,
@@ -212,6 +215,7 @@ export async function logMeal(input: LogMealInput): Promise<LogMealResult> {
       })
       .returning()
       .get();
+    if (!entry) continue;
 
     logged.push({ ...entry, foodSource: source } as Entry & {
       foodSource: string;

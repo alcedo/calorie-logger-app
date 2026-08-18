@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { foods } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { normalizeFoodName } from "@/lib/normalize";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const NUMERIC_FIELDS = [
   "servingSize",
@@ -19,6 +22,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await ensureDb();
   const { id } = await params;
   const body = await req.json().catch(() => null);
   if (!body) {
@@ -43,7 +47,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
-  const updated = db
+  const updated = await db
     .update(foods)
     .set(updates)
     .where(eq(foods.id, Number(id)))
@@ -59,8 +63,9 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await ensureDb();
   const { id } = await params;
-  const deleted = db
+  const deleted = await db
     .delete(foods)
     .where(eq(foods.id, Number(id)))
     .returning()

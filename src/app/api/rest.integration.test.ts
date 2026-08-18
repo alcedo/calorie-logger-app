@@ -49,7 +49,7 @@ describe("foods API", () => {
   });
 
   it("PATCH updates name/normalizedName and validates numerics", async () => {
-    const food = cacheFood({
+    const food = await cacheFood({
       name: "Edit Me",
       servingSize: 1,
       servingUnit: "serving",
@@ -83,7 +83,7 @@ describe("foods API", () => {
   });
 
   it("DELETE removes food and orphans entries", async () => {
-    const food = cacheFood({
+    const food = await cacheFood({
       name: "Delete Me",
       servingSize: 1,
       servingUnit: "serving",
@@ -93,7 +93,7 @@ describe("foods API", () => {
       fat: 1,
       source: "user",
     });
-    const entry = db
+    const entry = await db
       .insert(entries)
       .values({
         date: "2026-08-15",
@@ -115,9 +115,9 @@ describe("foods API", () => {
     });
     expect(res.status).toBe(200);
     expect(
-      db.select().from(foods).where(eq(foods.id, food.id)).get()
+      await db.select().from(foods).where(eq(foods.id, food.id)).get()
     ).toBeUndefined();
-    const orphan = db
+    const orphan = await db
       .select()
       .from(entries)
       .where(eq(entries.id, entry.id))
@@ -298,6 +298,21 @@ describe("history and status APIs", () => {
     if (originalWait === undefined) delete process.env.AI_LOGIN_START_WAIT_MS;
     else process.env.AI_LOGIN_START_WAIT_MS = originalWait;
   });
+
+  it("refuses Claude/Codex connect on Vercel instead of spawning a CLI", async () => {
+    const original = process.env.VERCEL;
+    process.env.VERCEL = "1";
+    const { POST } = await import("@/app/api/ai/route");
+    const res = await POST(
+      jsonRequest("POST", "/api/ai", { action: "connect", provider: "claude" }),
+    );
+    const { status, body } = await readJson<{ error: string }>(res);
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/cannot run on Vercel/i);
+    expect(body.error).toMatch(/AI_PROVIDER=openai/);
+    if (original === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = original;
+  });
 });
 
 describe("multi-step flows", () => {
@@ -401,7 +416,7 @@ describe("multi-step flows", () => {
       jsonRequest("DELETE", `/api/foods/${created.body.food.id}`),
       { params: Promise.resolve({ id: String(created.body.food.id) }) }
     );
-    const orphan = db
+    const orphan = await db
       .select()
       .from(entries)
       .where(eq(entries.id, entryId))

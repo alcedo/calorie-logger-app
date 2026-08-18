@@ -19,32 +19,32 @@ afterEach(() => {
 });
 
 describe("findFood / cacheFood", () => {
-  it("matches exact normalized names", () => {
-    const food = findFood("Eggs");
+  it("matches exact normalized names", async () => {
+    const food = await findFood("Eggs");
     expect(food?.name).toBe("Egg");
   });
 
-  it("matches aliases", () => {
-    const food = findFood("large egg");
+  it("matches aliases", async () => {
+    const food = await findFood("large egg");
     expect(food?.name).toBe("Egg");
   });
 
-  it("fuzzy-matches when query tokens are contained", () => {
-    const food = findFood("grilled chicken breast");
+  it("fuzzy-matches when query tokens are contained", async () => {
+    const food = await findFood("grilled chicken breast");
     expect(food?.name).toBe("Chicken Breast");
   });
 
-  it("does not collapse long queries into short substring foods", () => {
+  it("does not collapse long queries into short substring foods", async () => {
     // "dragonfruit smoothie bowl" must not match lone "Smoothie"
-    expect(findFood("dragonfruit smoothie bowl")).toBeUndefined();
+    expect(await findFood("dragonfruit smoothie bowl")).toBeUndefined();
   });
 
-  it("returns undefined for empty query", () => {
-    expect(findFood("   ")).toBeUndefined();
+  it("returns undefined for empty query", async () => {
+    expect(await findFood("   ")).toBeUndefined();
   });
 
-  it("cacheFood inserts a new food and dedupes by normalized name", () => {
-    const first = cacheFood({
+  it("cacheFood inserts a new food and dedupes by normalized name", async () => {
+    const first = await cacheFood({
       name: "Dragon Fruit",
       aliases: ["pitaya"],
       servingSize: 1,
@@ -58,7 +58,7 @@ describe("findFood / cacheFood", () => {
     expect(first.name).toBe("Dragon Fruit");
     expect(first.source).toBe("user");
 
-    const second = cacheFood({
+    const second = await cacheFood({
       name: "dragon fruit",
       servingSize: 1,
       servingUnit: "serving",
@@ -163,7 +163,7 @@ describe("POST /api/log", () => {
         date: "2026-01-02",
       })
     );
-    const rows = db
+    const rows = await db
       .select()
       .from(entries)
       .where(eq(entries.date, "2026-01-02"))
@@ -180,7 +180,7 @@ describe("POST /api/log", () => {
         date: "not-a-date",
       })
     );
-    const rows = db
+    const rows = await db
       .select()
       .from(entries)
       .where(eq(entries.date, utcToday))
@@ -323,7 +323,7 @@ describe("POST /api/log with mocked AI", () => {
       body.trace.some((e) => e.title && /searching the web/i.test(e.title)),
     ).toBe(true);
     expect(
-      db.select().from(foods).where(eq(foods.normalizedName, "dragon fruit")).get()
+      await db.select().from(foods).where(eq(foods.normalizedName, "dragon fruit")).get()
         ?.source
     ).toBe("ai");
   });
@@ -439,7 +439,7 @@ describe("GET /api/entries and entry mutations", () => {
 
     // Create a disposable food + entry path: orphan via SET NULL
     // Deleting seed Egg would break other tests in same DB — insert custom food instead
-    const custom = cacheFood({
+    const custom = await cacheFood({
       name: "Temp Food",
       servingSize: 1,
       servingUnit: "serving",
@@ -449,7 +449,7 @@ describe("GET /api/entries and entry mutations", () => {
       fat: 5,
       source: "user",
     });
-    const inserted = db
+    const inserted = await db
       .insert(entries)
       .values({
         date: "2026-08-15",
@@ -465,8 +465,8 @@ describe("GET /api/entries and entry mutations", () => {
       .returning()
       .get();
 
-    db.delete(foods).where(eq(foods.id, custom.id)).run();
-    const orphan = db
+    await db.delete(foods).where(eq(foods.id, custom.id)).run();
+    const orphan = await db
       .select()
       .from(entries)
       .where(eq(entries.id, inserted.id))

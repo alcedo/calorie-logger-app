@@ -26,6 +26,7 @@ describe("ai module", () => {
   const ORIGINAL_KEY = process.env.OPENAI_API_KEY;
   const ORIGINAL_MODEL = process.env.OPENAI_MODEL;
   const ORIGINAL_PROVIDER = process.env.AI_PROVIDER;
+  const ORIGINAL_VERCEL = process.env.VERCEL;
 
   beforeEach(async () => {
     createMock.mockReset();
@@ -52,6 +53,8 @@ describe("ai module", () => {
     else process.env.OPENAI_MODEL = ORIGINAL_MODEL;
     if (ORIGINAL_PROVIDER === undefined) delete process.env.AI_PROVIDER;
     else process.env.AI_PROVIDER = ORIGINAL_PROVIDER;
+    if (ORIGINAL_VERCEL === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = ORIGINAL_VERCEL;
   });
 
   it("does not treat OPENAI_API_KEY as available under auto", async () => {
@@ -72,6 +75,23 @@ describe("ai module", () => {
     expect(status.models.openai).toBe("gpt-4o-mini");
     expect(status.modelCatalog.openai.length).toBeGreaterThan(0);
     expect(status.activeModelLabel).toMatch(/GPT-4o mini/);
+  });
+
+  it("marks Claude and Codex unavailable on Vercel", async () => {
+    process.env.VERCEL = "1";
+    const { getAiStatus, clearAiStatusCache } = await import("./ai");
+    clearAiStatusCache();
+    const status = await getAiStatus();
+    expect(status.serverlessHost).toBe(true);
+    expect(status.providers.find((p) => p.id === "claude")?.reason).toBe(
+      "serverless",
+    );
+    expect(status.providers.find((p) => p.id === "codex")?.reason).toBe(
+      "serverless",
+    );
+    expect(status.aiAvailable).toBe(false);
+    delete process.env.VERCEL;
+    clearAiStatusCache();
   });
 
   it("parseMealText returns filtered items from OpenAI JSON", async () => {

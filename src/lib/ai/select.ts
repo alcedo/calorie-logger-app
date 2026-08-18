@@ -5,6 +5,9 @@ import type {
   ProviderAvailability,
   ProviderId,
 } from "./types";
+import {
+  SERVERLESS_NONE_BANNER,
+} from "../runtime";
 
 /** Auto never includes openai — that provider spends an API key. */
 export const AUTO_ORDER: ProviderId[] = ["claude", "codex"];
@@ -33,6 +36,7 @@ export interface ResolveAiStatusInput {
   probed: Record<ProviderId, ProviderAvailability>;
   strayAnthropicKey?: boolean;
   invalidProviderRaw?: string;
+  serverlessHost?: boolean;
 }
 
 export type ResolvedAiStatusView = Pick<
@@ -76,7 +80,9 @@ export function resolveAiStatusView(
           : API_KEY_BANNER;
     } else {
       bannerKind = "none";
-      bannerMessage = NONE_BANNER;
+      bannerMessage = input.serverlessHost
+        ? SERVERLESS_NONE_BANNER
+        : NONE_BANNER;
     }
   } else {
     const avail = probed[selection];
