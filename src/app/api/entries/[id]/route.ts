@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { entries, foods } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { servingsFor, macrosForServings } from "@/lib/units";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await ensureDb();
   const { id } = await params;
-  const deleted = db
+  const deleted = await db
     .delete(entries)
     .where(eq(entries.id, Number(id)))
     .returning()
@@ -24,6 +28,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await ensureDb();
   const { id } = await params;
   const body = await req.json().catch(() => null);
   const quantity = Number(body?.quantity);
@@ -31,7 +36,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid quantity" }, { status: 400 });
   }
 
-  const entry = db
+  const entry = await db
     .select()
     .from(entries)
     .where(eq(entries.id, Number(id)))
@@ -42,7 +47,7 @@ export async function PATCH(
 
   // Recompute macros from the linked food when possible; otherwise scale
   const food = entry.foodId
-    ? db.select().from(foods).where(eq(foods.id, entry.foodId)).get()
+    ? await db.select().from(foods).where(eq(foods.id, entry.foodId)).get()
     : undefined;
 
   let macros;
@@ -62,7 +67,7 @@ export async function PATCH(
     };
   }
 
-  const updated = db
+  const updated = await db
     .update(entries)
     .set({ quantity, ...macros })
     .where(eq(entries.id, Number(id)))

@@ -155,8 +155,9 @@ export default function AiPage() {
   const codexOn = Boolean(codex?.available);
   const claudeCliMissing = claude?.cliInstalled === false;
   const codexCliMissing = codex?.cliInstalled === false;
-  const claudeConnectBlocked = !status || claudeCliMissing;
-  const codexConnectBlocked = !status || codexCliMissing;
+  const serverlessHost = Boolean(status?.serverlessHost);
+  const claudeConnectBlocked = !status || claudeCliMissing || serverlessHost;
+  const codexConnectBlocked = !status || codexCliMissing || serverlessHost;
   const anyCliMissing = claudeCliMissing || codexCliMissing;
 
   return (
@@ -169,7 +170,15 @@ export default function AiPage() {
           USDA, Open Food Facts, and the web, and you can watch its thought
           process while logging.
         </p>
-        {anyCliMissing && (
+        {serverlessHost && (
+          <p className="mt-2 text-sm text-amber-300/90">
+            This server is on Vercel, so Claude Code and Codex CLIs cannot run
+            here. Set <code>AI_PROVIDER=openai</code> and{" "}
+            <code>OPENAI_API_KEY</code> in the Vercel project to look up unknown
+            foods.
+          </p>
+        )}
+        {anyCliMissing && !serverlessHost && (
           <p className="mt-2 text-sm text-amber-300/90">
             Connect runs on this app&apos;s server, not on your phone. Install
             the CLI on that computer, then refresh this page.
@@ -207,6 +216,8 @@ export default function AiPage() {
                 ? claude?.subscriptionType
                   ? claude.subscriptionType
                   : "Connected"
+                : serverlessHost
+                  ? "Unavailable on Vercel"
                 : claudeCliMissing
                   ? "CLI not installed"
                   : "Not connected"
@@ -275,6 +286,8 @@ export default function AiPage() {
           </div>
         )}
 
+        {!serverlessHost && (
+          <>
         <button
           type="button"
           onClick={() => setShowToken((v) => !v)}
@@ -304,6 +317,8 @@ export default function AiPage() {
             </button>
           </div>
         )}
+          </>
+        )}
       </section>
 
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
@@ -322,6 +337,8 @@ export default function AiPage() {
             label={
               codexOn
                 ? "Connected"
+                : serverlessHost
+                  ? "Unavailable on Vercel"
                 : codexCliMissing
                   ? "CLI not installed"
                   : "Not connected"

@@ -74,8 +74,33 @@ See [`.env.example`](.env.example). Useful variables:
 | `AI_CLI_TIMEOUT_MS` | Subprocess timeout, minimum 20000, default 60000 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Headless fallback; prefer `claude auth login` |
 | `OPENAI_API_KEY` | Paid opt-in; requires `AI_PROVIDER=openai` |
+| `TURSO_DATABASE_URL` | Hosted libSQL/Turso URL. Required on Vercel (`VERCEL=1`). |
+| `TURSO_AUTH_TOKEN` | Turso auth token paired with `TURSO_DATABASE_URL` |
 
 Verify a signed-in setup with `npm run ai:doctor`. Unauthenticated CLI wiring can be checked with `npm run ai:cli-smoke`.
+
+## Deploy on Vercel
+
+Vercel Functions have an ephemeral filesystem and cannot spawn the Claude Code or Codex CLIs. The app is set up for that:
+
+1. Create a [Turso](https://turso.tech) database (Vercel Marketplace → Turso Cloud, or `turso db create`).
+2. Import the project on [Vercel](https://vercel.com/new). Framework is Next.js (`vercel.json`).
+3. Set these project environment variables (Production and Preview):
+
+   | Variable | Value |
+   | --- | --- |
+   | `TURSO_DATABASE_URL` | `libsql://…` URL from Turso |
+   | `TURSO_AUTH_TOKEN` | Turso database token |
+   | `AI_PROVIDER` | `openai` |
+   | `OPENAI_API_KEY` | Your OpenAI API key |
+
+4. Deploy. The first request creates tables and seeds ~110 foods.
+
+Local `next dev` is unchanged: SQLite still lives at `data/app.db` when Turso env vars are unset. Claude/Codex CLI logins keep working on a machine that has those binaries.
+
+Without `OPENAI_API_KEY` on Vercel, built-in foods still log; unknown foods cannot be looked up. Meal logging can take ~60s (`maxDuration` on `/api/log`); Hobby plans cap functions at 10s unless you upgrade.
+
+Do **not** host this for other people against your OpenAI key or a shared Turso database unless you add auth. This is still a single-user tool.
 
 ## Testing
 
@@ -92,8 +117,8 @@ After you connect a subscription, `npm run ai:doctor` runs a live meal parse. `n
 ## Tech stack
 
 - Next.js 16 (App Router, TypeScript) — UI and API routes in one codebase
-- SQLite via better-sqlite3 + Drizzle ORM
-- Claude Code / Codex CLI structured JSON for meal parsing and nutrition lookup (OpenAI API opt-in)
+- SQLite via libSQL (`@libsql/client`) + Drizzle ORM — local `file:` database, or Turso on Vercel
+- Claude Code / Codex CLI structured JSON for meal parsing and nutrition lookup (OpenAI API on Vercel or as a paid opt-in)
 - USDA FoodData Central + Open Food Facts + DuckDuckGo for live nutrition search
 - Tailwind CSS
 

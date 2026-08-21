@@ -80,6 +80,24 @@ describe("resolveAiStatusView", () => {
     assert.equal(view.bannerMessage, NONE_BANNER);
   });
 
+  it("auto on Vercel points at the OpenAI API instead of CLI login", () => {
+    const view = resolveAiStatusView({
+      selection: "auto",
+      probed: probed({
+        claude: {
+          available: false,
+          detail: "cannot run on Vercel",
+          reason: "serverless",
+        },
+        openai: { available: true, detail: "key set" },
+      }),
+      serverlessHost: true,
+    });
+    assert.equal(view.provider, null);
+    assert.equal(view.bannerKind, "none");
+    assert.match(view.bannerMessage ?? "", /AI_PROVIDER=openai/);
+  });
+
   it("auto surfaces the API-key banner when Claude would bill a key", () => {
     const view = resolveAiStatusView({
       selection: "auto",

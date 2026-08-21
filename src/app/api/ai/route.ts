@@ -21,9 +21,11 @@ import {
   SETTING_AI_PROVIDER,
   SETTING_CLAUDE_OAUTH_TOKEN,
 } from "@/lib/settings";
+import { isServerlessHost, SERVERLESS_CONNECT_ERROR } from "@/lib/runtime";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function isKind(v: unknown): v is LoginKind {
   return v === "claude" || v === "codex";
@@ -36,6 +38,12 @@ export async function POST(req: NextRequest) {
   try {
     switch (action) {
       case "connect": {
+        if (isServerlessHost()) {
+          return NextResponse.json(
+            { error: SERVERLESS_CONNECT_ERROR },
+            { status: 400 },
+          );
+        }
         if (!isKind(body?.provider)) {
           return NextResponse.json({ error: "provider must be claude or codex" }, { status: 400 });
         }
@@ -72,16 +80,22 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "provider must be claude or codex" }, { status: 400 });
         }
         await logoutProvider(body.provider);
-        if (body.provider === "claude") deleteSetting(SETTING_CLAUDE_OAUTH_TOKEN);
+        if (body.provider === "claude") await deleteSetting(SETTING_CLAUDE_OAUTH_TOKEN);
         clearAiStatusCache();
         return NextResponse.json({ status: await getAiStatus() });
       }
       case "token": {
+        if (isServerlessHost()) {
+          return NextResponse.json(
+            { error: SERVERLESS_CONNECT_ERROR },
+            { status: 400 },
+          );
+        }
         const parsed = validateClaudeSetupToken(String(body?.token ?? ""));
         if (!parsed.ok) {
           return NextResponse.json({ error: parsed.error }, { status: 400 });
         }
-        setSetting(SETTING_CLAUDE_OAUTH_TOKEN, parsed.token);
+        await setSetting(SETTING_CLAUDE_OAUTH_TOKEN, parsed.token);
         clearAiStatusCache();
         return NextResponse.json({ status: await getAiStatus() });
       }
@@ -91,7 +105,7 @@ export async function POST(req: NextRequest) {
           if (!["auto", "claude", "codex", "openai", "none"].includes(selection)) {
             return NextResponse.json({ error: "Invalid preference" }, { status: 400 });
           }
-          setSetting(SETTING_AI_PROVIDER, selection);
+          await setSetting(SETTING_AI_PROVIDER, selection);
         }
         const models = body?.models as
           | { claude?: string; codex?: string; openai?: string }
@@ -113,12 +127,12 @@ export async function POST(req: NextRequest) {
             }
             if (normalized === "") {
               if (id === "openai") {
-                setSetting(key, "gpt-4o-mini");
+                await setSetting(key, "gpt-4o-mini");
               } else {
-                deleteSetting(key);
+                await deleteSetting(key);
               }
             } else {
-              setSetting(key, normalized);
+              await setSetting(key, normalized);
             }
           }
         }

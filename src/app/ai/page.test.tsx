@@ -39,6 +39,7 @@ function status(overrides: Partial<AiStatusDto> = {}): AiStatusDto {
     },
     activeModel: null,
     activeModelLabel: null,
+    serverlessHost: false,
     ...overrides,
   };
 }
@@ -114,5 +115,39 @@ describe("AI connections page", () => {
     });
     expect(screen.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled();
     expect(screen.queryByText("CLI not installed")).toBeNull();
+  });
+
+  it("disables Connect on Vercel and explains the OpenAI API fallback", async () => {
+    mockStatus(
+      status({
+        serverlessHost: true,
+        providers: [
+          {
+            id: "claude",
+            available: false,
+            detail: "Claude Code and Codex CLIs cannot run on Vercel.",
+            reason: "serverless",
+            cliInstalled: false,
+          },
+          {
+            id: "codex",
+            available: false,
+            detail: "Claude Code and Codex CLIs cannot run on Vercel.",
+            reason: "serverless",
+            cliInstalled: false,
+          },
+          { id: "openai", available: false, detail: "no key", reason: "missing" },
+        ],
+      }),
+    );
+    render(<AiPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Connect Claude" })).toBeDisabled();
+    });
+    expect(screen.getByRole("button", { name: "Connect ChatGPT" })).toBeDisabled();
+    expect(screen.getAllByText("Unavailable on Vercel")).toHaveLength(2);
+    expect(screen.getByText(/This server is on Vercel/i)).toBeVisible();
+    expect(screen.queryByText(/Install the CLI on that computer/i)).toBeNull();
   });
 });

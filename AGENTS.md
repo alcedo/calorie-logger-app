@@ -14,3 +14,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - SQLite DB is created/seeded at `data/app.db` on first request. Sign in with `claude auth login` (preferred) or `codex login` for AI meal parsing — the CLIs must already be on the **server**. `OPENAI_API_KEY` is a paid opt-in (`AI_PROVIDER=openai`) and is never auto-selected. Without a signed-in CLI, only ~110 built-in foods resolve.
 - Smoke check: `POST /api/log` with `{"text":"2 eggs and 200g chicken breast"}`, then `GET /api/entries?date=YYYY-MM-DD`.
 - Contract tests for Claude/Codex login (no live subscription required): `npm test`. Live signed-in probe: `npm run ai:doctor`.
+- Vercel: set `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` (hosted SQLite). File SQLite is ephemeral on Vercel. CLI providers cannot run there — set `AI_PROVIDER=openai` and `OPENAI_API_KEY` for unknown-food lookup. Local `next dev` still uses `data/app.db` and Claude/Codex CLIs.

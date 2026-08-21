@@ -2,6 +2,9 @@
   "name": "calorie-logger",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,7 +17,7 @@
     "ai:cli-smoke": "tsx scripts/ai-cli-smoke.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "@libsql/client": "^0.17.4",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.1",
     "openai": "^7.4.0",
@@ -27,7 +30,6 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.4",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { entries, goals } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function GET(req: NextRequest) {
+  await ensureDb();
   const date =
     req.nextUrl.searchParams.get("date") ??
     new Date().toISOString().slice(0, 10);
 
-  const dayEntries = db
+  const dayEntries = await db
     .select()
     .from(entries)
     .where(eq(entries.date, date))
@@ -28,7 +32,7 @@ export async function GET(req: NextRequest) {
     { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 }
   );
 
-  const userGoals = db.select().from(goals).where(eq(goals.id, 1)).get();
+  const userGoals = await db.select().from(goals).where(eq(goals.id, 1)).get();
 
   return NextResponse.json({ date, entries: dayEntries, totals, goals: userGoals });
 }

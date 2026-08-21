@@ -61,9 +61,9 @@ export function normalizeModelId(raw: unknown): string | undefined {
   return value;
 }
 
-function readSetting(key: string): string | undefined {
+async function readSetting(key: string): Promise<string | undefined> {
   try {
-    return getSetting(key);
+    return await getSetting(key);
   } catch {
     return undefined;
   }
@@ -73,8 +73,8 @@ function readSetting(key: string): string | undefined {
  * In-app choice wins, then env, then provider default.
  * Empty string means "CLI default" (omit --model).
  */
-export function resolveModelFor(provider: ProviderId): string | undefined {
-  const fromSetting = normalizeModelId(readSetting(MODEL_SETTING_KEYS[provider]));
+export async function resolveModelFor(provider: ProviderId): Promise<string | undefined> {
+  const fromSetting = normalizeModelId(await readSetting(MODEL_SETTING_KEYS[provider]));
   if (fromSetting !== undefined) {
     return fromSetting || undefined;
   }
@@ -86,8 +86,8 @@ export function resolveModelFor(provider: ProviderId): string | undefined {
   return undefined;
 }
 
-export function selectedModelId(provider: ProviderId): string {
-  const resolved = resolveModelFor(provider);
+export async function selectedModelId(provider: ProviderId): Promise<string> {
+  const resolved = await resolveModelFor(provider);
   if (provider === "openai") return resolved || DEFAULT_OPENAI_MODEL;
   return resolved ?? "";
 }

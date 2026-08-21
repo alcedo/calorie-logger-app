@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { foods, type Food } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { normalizeFoodName } from "./normalize";
@@ -10,18 +10,19 @@ import { normalizeFoodName } from "./normalize";
  * 3. token-overlap fuzzy match (all query tokens contained in a food's
  *    name tokens or vice versa), preferring the closest token count
  */
-export function findFood(query: string): Food | undefined {
+export async function findFood(query: string): Promise<Food | undefined> {
   const key = normalizeFoodName(query);
   if (!key) return undefined;
 
-  const exact = db
+  await ensureDb();
+  const exact = await db
     .select()
     .from(foods)
     .where(eq(foods.normalizedName, key))
     .get();
   if (exact) return exact;
 
-  const all = db.select().from(foods).all();
+  const all = await db.select().from(foods).all();
 
   for (const f of all) {
     const aliases: string[] = JSON.parse(f.aliases || "[]");
@@ -71,16 +72,17 @@ export interface FoodNutritionInput {
 }
 
 /** Insert a food into the cache; returns the stored row. */
-export function cacheFood(input: FoodNutritionInput): Food {
+export async function cacheFood(input: FoodNutritionInput): Promise<Food> {
   const normalizedName = normalizeFoodName(input.name);
-  const existing = db
+  await ensureDb();
+  const existing = await db
     .select()
     .from(foods)
     .where(eq(foods.normalizedName, normalizedName))
     .get();
   if (existing) return existing;
 
-  return db
+  const inserted = await db
     .insert(foods)
     .values({
       name: input.name,
@@ -101,4 +103,8 @@ export function cacheFood(input: FoodNutritionInput): Food {
     })
     .returning()
     .get();
+  if (!inserted) {
+    throw new Error("Failed to cache food");
+  }
+  return inserted;
 }

@@ -21,6 +21,10 @@ import {
   SETTING_AI_PROVIDER,
 } from "../settings";
 import {
+  isServerlessHost,
+  SERVERLESS_CLI_DETAIL,
+} from "../runtime";
+import {
   formatSearchResultsForPrompt,
   searchNutritionWeb,
   searchQueryFor,
@@ -89,10 +93,10 @@ const STATUS_TTL_MS = 30_000;
 
 let statusCache: { at: number; value: AiStatusDto } | null = null;
 
-function readSelection(): AiSelection | "invalid" {
+async function readSelection(): Promise<AiSelection | "invalid"> {
   const raw = (
     process.env.AI_PROVIDER ||
-    getSetting(SETTING_AI_PROVIDER) ||
+    (await getSetting(SETTING_AI_PROVIDER)) ||
     "auto"
   )
     .trim()
@@ -120,6 +124,19 @@ function toDto(
 }
 
 async function probeAll(): Promise<Record<ProviderId, ProviderAvailability>> {
+  if (isServerlessHost()) {
+    const unavailable: ProviderAvailability = {
+      available: false,
+      detail: SERVERLESS_CLI_DETAIL,
+      reason: "serverless",
+      cliInstalled: false,
+    };
+    return {
+      claude: unavailable,
+      codex: unavailable,
+      openai: await openaiProvider.isAvailable(),
+    };
+  }
   const [claude, codex, openai] = await Promise.all([
     claudeProvider.isAvailable(),
     codexProvider.isAvailable(),
@@ -134,22 +151,24 @@ export async function getAiStatus(): Promise<AiStatusDto> {
     return statusCache.value;
   }
 
-  const selection = readSelection();
+  const selection = await readSelection();
   const probed = await probeAll();
   const providers = (["claude", "codex", "openai"] as const).map((id) =>
     toDto(id, probed[id]),
   );
+  const serverlessHost = isServerlessHost();
   const view = resolveAiStatusView({
     selection,
     probed,
     strayAnthropicKey: hasStrayAnthropicKey(),
     invalidProviderRaw: process.env.AI_PROVIDER,
+    serverlessHost,
   });
 
   const models = {
-    claude: selectedModelId("claude"),
-    codex: selectedModelId("codex"),
-    openai: selectedModelId("openai"),
+    claude: await selectedModelId("claude"),
+    codex: await selectedModelId("codex"),
+    openai: await selectedModelId("openai"),
   };
   const modelCatalog = {
     claude: catalogWithSelected("claude", models.claude),
@@ -170,6 +189,7 @@ export async function getAiStatus(): Promise<AiStatusDto> {
       view.provider && activeModel !== null
         ? labelForModel(view.provider, activeModel)
         : null,
+    serverlessHost,
   };
   statusCache = { at: now, value };
   return value;
@@ -212,7 +232,7 @@ export async function parseMealText(
     user: text,
     schemaName: "meal_items",
     schema: PARSE_JSON_SCHEMA,
-    model: resolveModelFor(provider.id),
+    model: await resolveModelFor(provider.id),
   });
   const reasoning =
     typeof parsed.reasoning === "string" ? parsed.reasoning.trim() : "";
@@ -308,7 +328,7 @@ export async function lookupNutrition(
     )}`,
     schemaName: "food_nutrition_batch",
     schema: BATCH_NUTRITION_JSON_SCHEMA,
-    model: resolveModelFor(provider.id),
+    model: await resolveModelFor(provider.id),
   });
 
   const reasoning =

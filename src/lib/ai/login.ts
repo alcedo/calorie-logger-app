@@ -197,7 +197,7 @@ export async function startClaudeLogin(): Promise<LoginSessionPublic> {
   const { child, sessionBuf, closed } = await spawnUntilParsed(
     claudeBin(),
     [...CLAUDE_AUTH_LOGIN_ARGS],
-    claudeChildEnv(),
+    await claudeChildEnv(),
     parseClaudeLoginOutput,
   );
   const parsed = parseClaudeLoginOutput(sessionBuf.current);
@@ -365,7 +365,7 @@ export async function logoutProvider(provider: LoginKind): Promise<void> {
     await runCli({
       command: claudeBin(),
       args: [...CLAUDE_AUTH_LOGOUT_ARGS],
-      env: claudeChildEnv(),
+      env: await claudeChildEnv(),
       timeoutMs: PROBE_TIMEOUT_MS,
     }).catch(() => undefined);
   } else {

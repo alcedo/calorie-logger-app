@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { entries } from "@/db/schema";
 import { sql, desc, gte } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function GET(req: NextRequest) {
+  await ensureDb();
   const days = Math.min(
     Math.max(Number(req.nextUrl.searchParams.get("days")) || 30, 1),
     365
@@ -12,7 +16,7 @@ export async function GET(req: NextRequest) {
     .toISOString()
     .slice(0, 10);
 
-  const rows = db
+  const rows = await db
     .select({
       date: entries.date,
       entryCount: sql<number>`count(*)`,
@@ -27,5 +31,14 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(entries.date))
     .all();
 
-  return NextResponse.json({ days: rows });
+  return NextResponse.json({
+    days: rows.map((row) => ({
+      date: row.date,
+      entryCount: Number(row.entryCount),
+      calories: Number(row.calories),
+      protein: Number(row.protein),
+      carbs: Number(row.carbs),
+      fat: Number(row.fat),
+    })),
+  });
 }

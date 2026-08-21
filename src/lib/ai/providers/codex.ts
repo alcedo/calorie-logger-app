@@ -20,12 +20,21 @@ import type {
   GenerateJsonRequest,
   ProviderAvailability,
 } from "../types";
+import { isServerlessHost, SERVERLESS_CLI_DETAIL } from "../../runtime";
 
 export const codexProvider: AiProvider = {
   id: "codex",
   label: "Codex CLI (ChatGPT login)",
 
   async isAvailable(): Promise<ProviderAvailability> {
+    if (isServerlessHost()) {
+      return {
+        available: false,
+        detail: SERVERLESS_CLI_DETAIL,
+        reason: "serverless",
+        cliInstalled: false,
+      };
+    }
     const env = codexChildEnv();
     const command = codexBin();
     if (!cliIsInstalled(command, env)) {
@@ -77,6 +86,9 @@ export const codexProvider: AiProvider = {
   },
 
   async generateJson<T>(req: GenerateJsonRequest): Promise<T> {
+    if (isServerlessHost()) {
+      throw new Error(SERVERLESS_CLI_DETAIL);
+    }
     const env = codexChildEnv();
     const cwd = await mkdtemp(join(tmpdir(), "macro-codex-"));
     const schemaPath = join(cwd, "schema.json");

@@ -27,7 +27,7 @@ export interface AiNutrition {
 
 export type ProviderId = "openai" | "codex" | "claude";
 
-export type ProviderReason = "missing" | "api_key" | "error";
+export type ProviderReason = "missing" | "api_key" | "error" | "serverless";
 
 export interface ProviderAvailability {
   available: boolean;
@@ -101,4 +101,6 @@ export interface AiStatusDto {
   modelCatalog: Record<ProviderId, ModelOptionDto[]>;
   activeModel: string | null;
   activeModelLabel: string | null;
+  /** True when the Next.js server is a Vercel Function (no CLI spawn). */
+  serverlessHost: boolean;
 }
