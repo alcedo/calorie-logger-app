@@ -17,7 +17,7 @@ export const VERCEL_DB_REQUIRED_ERROR =
   "Vercel deployments need a hosted SQLite database. Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN. Local file SQLite is ephemeral on Vercel and will lose data.";
 
 export function isServerlessHost(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): boolean {
   return env.VERCEL === "1" || env.VERCEL === "true";
 }

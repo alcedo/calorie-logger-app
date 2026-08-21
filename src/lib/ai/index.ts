@@ -20,7 +20,10 @@ import {
   getSetting,
   SETTING_AI_PROVIDER,
 } from "../settings";
-import { isServerlessHost } from "../runtime";
+import {
+  isServerlessHost,
+  SERVERLESS_CLI_DETAIL,
+} from "../runtime";
 import {
   formatSearchResultsForPrompt,
   searchNutritionWeb,
@@ -121,6 +124,19 @@ function toDto(
 }
 
 async function probeAll(): Promise<Record<ProviderId, ProviderAvailability>> {
+  if (isServerlessHost()) {
+    const unavailable: ProviderAvailability = {
+      available: false,
+      detail: SERVERLESS_CLI_DETAIL,
+      reason: "serverless",
+      cliInstalled: false,
+    };
+    return {
+      claude: unavailable,
+      codex: unavailable,
+      openai: await openaiProvider.isAvailable(),
+    };
+  }
   const [claude, codex, openai] = await Promise.all([
     claudeProvider.isAvailable(),
     codexProvider.isAvailable(),

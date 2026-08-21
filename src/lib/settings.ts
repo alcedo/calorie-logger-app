@@ -9,7 +9,11 @@ export const SETTING_AI_CODEX_MODEL = "ai_codex_model";
 export const SETTING_AI_OPENAI_MODEL = "ai_openai_model";
 
 export async function getSetting(key: string): Promise<string | undefined> {
-  await ensureDb();
+  try {
+    await ensureDb();
+  } catch {
+    return undefined;
+  }
   const row = await db
     .select()
     .from(settings)

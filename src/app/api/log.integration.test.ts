@@ -312,7 +312,12 @@ describe("POST /api/log with mocked AI", () => {
       })
     );
     const { body } = await readJson<{
-      logged: Array<{ foodName: string; calories: number; foodSource?: string }>;
+      logged: Array<{
+        foodName: string;
+        calories: number;
+        foodId: number | null;
+        foodSource?: string;
+      }>;
       unresolved: unknown[];
       trace: Array<{ type: string; title?: string }>;
     }>(res);
@@ -322,10 +327,18 @@ describe("POST /api/log with mocked AI", () => {
     expect(
       body.trace.some((e) => e.title && /searching the web/i.test(e.title)),
     ).toBe(true);
-    expect(
-      await db.select().from(foods).where(eq(foods.normalizedName, "dragon fruit")).get()
-        ?.source
-    ).toBe("ai");
+    const { db: liveDb } = await import("@/db");
+    const foodId = body.logged[0]?.foodId;
+    const byId = foodId
+      ? await liveDb.select().from(foods).where(eq(foods.id, foodId)).get()
+      : undefined;
+    const byName = await liveDb
+      .select()
+      .from(foods)
+      .where(eq(foods.normalizedName, "dragon fruit"))
+      .get();
+    expect(byId?.source ?? byName?.source).toBe("ai");
+    expect(byName?.normalizedName ?? byId?.normalizedName).toBe("dragon fruit");
   });
 
   it("partially succeeds when nutrition lookup fails for one item", async () => {

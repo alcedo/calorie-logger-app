@@ -11,13 +11,20 @@ export interface DatabaseConfig {
   remote: boolean;
 }
 
+/** Minimal env bag so tests can pass partial objects. */
+export type EnvBag = Record<string, string | undefined>;
+
 export function isRemoteLibsqlUrl(url: string): boolean {
   return /^(libsql|https|http):\/\//i.test(url.trim());
 }
 
+function resolveOverrideFile(filePath: string): string {
+  return path.resolve(/* turbopackIgnore: true */ filePath);
+}
+
 export function resolveDatabaseConfig(opts?: {
   dbFilePath?: string;
-  env?: NodeJS.ProcessEnv;
+  env?: EnvBag;
 }): DatabaseConfig {
   const env = opts?.env ?? process.env;
   const turso = env.TURSO_DATABASE_URL?.trim();
@@ -32,7 +39,7 @@ export function resolveDatabaseConfig(opts?: {
   }
 
   if (turso?.startsWith("file:")) {
-    const filePath = path.resolve(turso.slice("file:".length));
+    const filePath = resolveOverrideFile(turso.slice("file:".length));
     return { url: `file:${filePath}`, filePath, remote: false };
   }
 
@@ -44,10 +51,16 @@ export function resolveDatabaseConfig(opts?: {
     throw new Error(VERCEL_DB_REQUIRED_ERROR);
   }
 
-  const filePath = path.resolve(
-    opts?.dbFilePath ||
-      env.CALORIE_LOGGER_DB_PATH ||
-      path.join(process.cwd(), "data", "app.db"),
-  );
+  if (opts?.dbFilePath) {
+    const filePath = resolveOverrideFile(opts.dbFilePath);
+    return { url: `file:${filePath}`, filePath, remote: false };
+  }
+
+  if (env.CALORIE_LOGGER_DB_PATH) {
+    const filePath = resolveOverrideFile(env.CALORIE_LOGGER_DB_PATH);
+    return { url: `file:${filePath}`, filePath, remote: false };
+  }
+
+  const filePath = path.join(process.cwd(), "data", "app.db");
   return { url: `file:${filePath}`, filePath, remote: false };
 }
