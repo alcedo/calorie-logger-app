@@ -32,7 +32,7 @@ Ready when `GET $URL` and `GET $URL/api/status` answer. The Next log is `$TMP/ma
 
 Host must stay `127.0.0.1` for the whole run. Next.js in this repo blocks mixing `127.0.0.1` and `localhost` (same as Playwright e2e). Default port is `4173` or the next free port; never steal `:3000`.
 
-Two verification instances can run side by side if each has its own `--port` and `--run-id`. Do not point two runs at the same DB path.
+Launch sets `NEXT_DIST_DIR=.next-verify-$RUN_ID` so this instance does not fight the lock in `.next` (Cloud Agent `npm run dev` on `:3000` keeps that lock). Cleanup deletes that dist dir. Two verification instances can run side by side if each has its own `--port`, `--run-id`, and therefore its own dist dir. Do not point two runs at the same DB path.
 
 Teardown is `control-macro cleanup` (see Cleanup). That is also how a short-lived run ends; there is no CLI/TUI binary to keep around.
 

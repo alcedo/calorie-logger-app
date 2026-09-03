@@ -85,10 +85,18 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function waitForHttp(url, timeoutMs) {
+async function waitForHttp(url, timeoutMs, nextLog) {
   const start = Date.now();
   let last = "";
   while (Date.now() - start < timeoutMs) {
+    if (nextLog && fs.existsSync(nextLog)) {
+      const log = fs.readFileSync(nextLog, "utf8");
+      if (log.includes("Another next dev server is already running")) {
+        throw new Error(
+          `Next refused to start a second dev server. Set NEXT_DIST_DIR to a unique folder inside the repo. Log: ${nextLog}`,
+        );
+      }
+    }
     try {
       const res = await fetch(url, { redirect: "manual" });
       if (res.ok || (res.status >= 200 && res.status < 500)) return res.status;
@@ -262,6 +270,7 @@ async function cmdLaunch(flags) {
   const dir = path.join(os.tmpdir(), `macro-verify-${runId}`);
   fs.mkdirSync(dir, { recursive: true });
   const dbPath = path.join(dir, "app.db");
+  const distDir = `.next-verify-${runId}`;
   const url = `http://${host}:${port}`;
   const nextLog = path.join(dir, "next.log");
   const daemonLog = path.join(dir, "daemon.log");
@@ -278,6 +287,7 @@ async function cmdLaunch(flags) {
       env: {
         ...process.env,
         CALORIE_LOGGER_DB_PATH: dbPath,
+        NEXT_DIST_DIR: distDir,
         AI_PROVIDER: "none",
         AI_CLAUDE_BIN: FAKE_CLAUDE,
         AI_CODEX_BIN: FAKE_CODEX,
@@ -296,6 +306,7 @@ async function cmdLaunch(flags) {
     host,
     port,
     dbPath,
+    distDir,
     pid: child.pid,
     aiProvider: "none",
     startedAt: new Date().toISOString(),
@@ -317,8 +328,8 @@ async function cmdLaunch(flags) {
   }
 
   try {
-    await waitForHttp(url, 120_000);
-    await waitForHttp(`${url}/api/status`, 30_000);
+    await waitForHttp(url, 120_000, nextLog);
+    await waitForHttp(`${url}/api/status`, 30_000, nextLog);
   } catch (err) {
     try {
       process.kill(-child.pid, "SIGTERM");
@@ -490,6 +501,12 @@ function cmdCleanup() {
     }
   }
   const dir = path.dirname(state._file);
+  if (state.distDir && !String(state.distDir).includes("..")) {
+    fs.rmSync(path.join(REPO_ROOT, state.distDir), {
+      recursive: true,
+      force: true,
+    });
+  }
   fs.rmSync(dir, { recursive: true, force: true });
   try {
     if (fs.existsSync(CURRENT_LINK) && fs.readlinkSync(CURRENT_LINK) === dir) {
