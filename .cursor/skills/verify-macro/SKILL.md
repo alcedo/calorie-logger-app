@@ -23,7 +23,7 @@ eval "$(control-macro launch | node -e 'let s="";process.stdin.on("data",d=>s+=d
 
 `launch` prints JSON including `url`, `dbPath`, `state`, and `export`. Run the `export MACRO_VERIFY_STATE=...` line (or set it from the JSON) so later commands talk to this run.
 
-Ready when `GET $URL` and `GET $URL/api/status` answer. The Next log is `$TMP/macro-verify-$RUN_ID/next.log`. Env pinned by launch:
+Ready when `GET $URL` and `GET $URL/api/status` answer. The Next log is `$TMP/macro-verify-$RUN_ID/next.log`. The browser daemon needs Playwright Chromium (`npx playwright install chromium` from the repo root if launch fails on the daemon). Env pinned by launch:
 
 - `CALORIE_LOGGER_DB_PATH` — disposable file; first request seeds ~110 built-in foods and default goals (2000 / 120 / 225 / 65)
 - `AI_PROVIDER=none` — built-in parser only; unknown foods do not resolve
@@ -73,7 +73,7 @@ Stable handles from this UI (prefer these over CSS or coordinates):
 - Nav links named `Today`, `History`, `Foods`, `AI`; brand link `Macro`
 - Today composer: placeholder `What did you eat`; button `Log` (exact; becomes `Logging…` while busy)
 - Voice button `Log by voice` — Chrome Web Speech only; skip in this harness
-- AI-off banner text `/AI is not configured/i` linking to `/ai`
+- AI-off banner text `/AI is not configured/i` (full copy mentions connecting Claude or ChatGPT on the AI page) linking to `/ai`
 - Combobox `AI provider` on Today and `/ai`
 - Foods search placeholder `Search foods…`; row buttons `Edit`, `Save`, `Cancel`, `Delete`
 - Spinbuttons labeled `Calories`, `Protein (g)`, and the goals fields `Calories (kcal)`, `Protein (g)`, `Carbs (g)`, `Fat (g)`

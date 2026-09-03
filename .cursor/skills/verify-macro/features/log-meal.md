@@ -24,7 +24,7 @@ Preconditions:
 - No entries exist for today's local date.
 - The disposable DB still has seeded `Egg` and `Chicken Breast`.
 
-- **Open Today.** Go to the default route. Run `control-macro browser goto --path /`. The heading `Today's food` appears, the empty copy `Nothing logged yet. Tell me what you ate below.` is visible, and a banner matches `AI is not configured`.
+- **Open Today.** Go to the default route. Run `control-macro browser goto --path /`. The heading `Today's food` appears, the empty copy `Nothing logged yet. Tell me what you ate below.` is visible, and a banner matching `AI is not configured` is visible.
 - **Capture empty state.** Run `control-macro browser screenshot --path artifacts/log-meal/before.png`. The screenshot shows Macro, the empty list, and the composer placeholder.
 - **Enter the smoke sentence.** Type in the composer. Run `control-macro browser fill --placeholder "What did you eat" --value "2 eggs and 200g chicken breast"`. The `Log` button enables.
 - **Submit.** Choose `Log`. Run `control-macro browser click --role button --name Log --exact`. The button may show `Logging…` then return to `Log`.
