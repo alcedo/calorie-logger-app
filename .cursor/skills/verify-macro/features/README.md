@@ -44,6 +44,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 ## Features
 
 - [Log a meal](./log-meal.md) covers Today composer logging, the calorie ring, thought process, and persistence.
+- [Log by voice](./voice-log.md) covers the mic button, listening state, speech transcript into the composer, and the same log path as typed text.
 - [History](./history.md) covers the day list, expanding a day, and seeing the same entries.
 - [Foods and goals](./foods-and-goals.md) covers food search, inline edit, and daily goal save.
 - [AI connections](./ai-connections.md) covers the AI-off banner, provider pickers, and disabled Connect controls on this harness.

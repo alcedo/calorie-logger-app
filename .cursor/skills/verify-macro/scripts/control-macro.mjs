@@ -162,6 +162,40 @@ async function runDaemon() {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
   });
+  // Chromium has no Web Speech service. This stub is the same production
+  // boundary Chrome would fill; the app still owns start/stop/transcript UI.
+  await context.addInitScript(() => {
+    class MacroVerifySpeechRecognition {
+      constructor() {
+        this.lang = "";
+        this.continuous = false;
+        this.interimResults = false;
+        this.onresult = null;
+        this.onend = null;
+        this.onerror = null;
+      }
+      start() {
+        window.__macroVerifySpeech = this;
+      }
+      stop() {
+        if (typeof this.onend === "function") this.onend();
+        if (window.__macroVerifySpeech === this) {
+          window.__macroVerifySpeech = null;
+        }
+      }
+      abort() {
+        if (typeof this.onerror === "function") {
+          this.onerror({ error: "aborted" });
+        }
+        if (typeof this.onend === "function") this.onend();
+        if (window.__macroVerifySpeech === this) {
+          window.__macroVerifySpeech = null;
+        }
+      }
+    }
+    window.SpeechRecognition = MacroVerifySpeechRecognition;
+    window.webkitSpeechRecognition = MacroVerifySpeechRecognition;
+  });
   const page = await context.newPage();
   const server = net.createServer((sock) => {
     let buf = "";
@@ -251,6 +285,32 @@ async function handleBrowser(page, req) {
       const aria = await page.locator("body").ariaSnapshot();
       fs.writeFileSync(req.path, aria);
       return { path: req.path };
+    }
+    case "speech": {
+      if (req.value === undefined || String(req.value).trim() === "") {
+        throw new Error("--value is required (spoken transcript)");
+      }
+      const transcript = String(req.value);
+      await page.evaluate((text) => {
+        const rec = window.__macroVerifySpeech;
+        if (!rec) {
+          throw new Error(
+            "Speech recognition is not listening. Click Log by voice first.",
+          );
+        }
+        const results = {
+          length: 1,
+          0: { 0: { transcript: text }, isFinal: true },
+        };
+        if (typeof rec.onresult === "function") {
+          rec.onresult({ resultIndex: 0, results });
+        }
+        if (typeof rec.onend === "function") rec.onend();
+        if (window.__macroVerifySpeech === rec) {
+          window.__macroVerifySpeech = null;
+        }
+      }, transcript);
+      return { transcript };
     }
     case "title":
       return { title: await page.title(), url: page.url() };
@@ -538,6 +598,7 @@ function usage() {
   control-macro browser wait --text Egg [--timeout 20000]
   control-macro browser screenshot --path artifacts/log-meal/after.png
   control-macro browser snapshot --aria --path artifacts/log-meal/after.aria.txt
+  control-macro browser speech --value "2 eggs and 200g chicken breast"
   control-macro http get --path /api/status
   control-macro http post --path /api/log --json '{"text":"...","date":"YYYY-MM-DD"}'
   control-macro cleanup`);
@@ -557,6 +618,17 @@ if (argv[0] === "_daemon") {
     if (flags.aria && op === "snapshot") {
       /* accepted for the documented --aria flag */
     }
+    const allowed = [
+      "goto",
+      "click",
+      "fill",
+      "wait",
+      "screenshot",
+      "snapshot",
+      "speech",
+      "title",
+    ];
+    if (!allowed.includes(op)) usage();
     await cmdBrowser(op, flags);
   } else if (cmd === "http") {
     const method = (positional[1] || "get").toUpperCase();
