@@ -36,6 +36,12 @@ npm run dev
 
 Open http://localhost:3000. The SQLite database is created and seeded automatically at `data/app.db` on first request.
 
+## How to try the hosted app
+
+Open https://calorie-logger-app.vercel.app and log a built-in food, for example `2 eggs and 200g chicken breast`.
+
+Vercel Functions cannot write under the app directory, so the host stores SQLite in the instance tmp directory (`calorie-logger.db`). A cold start starts from an empty seeded database. Claude Code and Codex logins do not run on Vercel. Those CLIs are not installed there.
+
 Without a signed-in CLI, the app still works for foods already in the database (a simple built-in parser handles inputs like "2 eggs and 200g chicken breast"), but unknown foods can't be looked up.
 
 Open **AI** in the app to connect a Claude or ChatGPT subscription from your phone: Claude shows a login link plus a code to paste; ChatGPT uses Codex device-auth (open the page, type the one-time code). No API keys.
