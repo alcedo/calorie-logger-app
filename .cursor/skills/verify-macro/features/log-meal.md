@@ -35,7 +35,7 @@ Preconditions:
 
 ## Gotchas
 
-- Voice (`Log by voice`) is not available in this headless harness. Do not report it as verified.
+- Voice (`Log by voice`) is a separate feature. See [voice-log.md](./voice-log.md). Do not treat a typed log as voice proof.
 - `POST /api/log` is not the Today entry point. Use it only as a second view, and always send `date` as the local calendar day.
 - Unknown foods stay unresolved while `bannerKind` is `none`. Do not use novel brand names as the smoke sentence.
 - `Log` is disabled while the textarea is empty. Fill before click.

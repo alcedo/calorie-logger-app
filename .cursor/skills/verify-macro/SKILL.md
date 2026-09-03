@@ -1,6 +1,6 @@
 ---
 name: verify-macro
-description: Drive the Macro calorie-logger web UI (Today, History, Foods, AI) on an isolated Next.js instance and capture proof. Use when verifying meal logging, dashboard totals, history, food/goal edits, or AI settings — not for unit tests or the shared laptop-forwarded :3000 server.
+description: Drive the Macro calorie-logger web UI (Today, History, Foods, AI, voice log) on an isolated Next.js instance and capture proof. Use when verifying meal logging, voice composer input, dashboard totals, history, food/goal edits, or AI settings — not for unit tests or the shared laptop-forwarded :3000 server.
 ---
 
 # Verify Macro
@@ -29,6 +29,7 @@ Ready when `GET $URL` and `GET $URL/api/status` answer. The Next log is `$TMP/ma
 - `AI_PROVIDER=none` — built-in parser only; unknown foods do not resolve
 - `AI_CLAUDE_BIN` / `AI_CODEX_BIN` — fake paths so Connect stays disabled
 - `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` cleared
+- Playwright Chromium has no Web Speech service. Launch installs a page `SpeechRecognition` stub so the mic button renders. `control-macro browser speech --value "…"` delivers the transcript the way Chrome would; it is not a live microphone.
 
 Host must stay `127.0.0.1` for the whole run. Next.js in this repo blocks mixing `127.0.0.1` and `localhost` (same as Playwright e2e). Default port is `4173` or the next free port; never steal `:3000`.
 
@@ -62,6 +63,9 @@ control-macro browser goto --path /
 control-macro browser fill --placeholder "What did you eat" --value "2 eggs and 200g chicken breast"
 control-macro browser click --role button --name Log --exact
 control-macro browser wait --text Egg --timeout 20000
+control-macro browser click --role button --name "Log by voice"
+control-macro browser wait --placeholder "Listening"
+control-macro browser speech --value "2 eggs and 200g chicken breast"
 control-macro browser screenshot --path artifacts/log-meal/after.png
 control-macro browser snapshot --aria --path artifacts/log-meal/after.aria.txt
 control-macro http get --path /api/entries?date=YYYY-MM-DD
@@ -72,7 +76,7 @@ Stable handles from this UI (prefer these over CSS or coordinates):
 
 - Nav links named `Today`, `History`, `Foods`, `AI`; brand link `Macro`
 - Today composer: placeholder `What did you eat`; button `Log` (exact; becomes `Logging…` while busy)
-- Voice button `Log by voice` — Chrome Web Speech only; skip in this harness
+- Voice button `Log by voice` (becomes `Stop listening` while the recognizer is active); placeholder `Listening… speak your meal`
 - AI-off banner text `/AI is not configured/i` (full copy mentions connecting Claude or ChatGPT on the AI page) linking to `/ai`
 - Combobox `AI provider` on Today and `/ai`
 - Foods search placeholder `Search foods…`; row buttons `Edit`, `Save`, `Cancel`, `Delete`
@@ -97,6 +101,7 @@ Proof standards:
 - Capture the action and the resulting state: before (empty Today / banner), the filled composer or the click, then the list + dashboard. An after-only screenshot is not enough.
 - Verify side effects: `GET /api/entries?date=<local>` must contain the same food names and calorie total the UI shows. After a food or goal edit, re-read `/api/foods?q=` or `/api/goals`.
 - This launch pins `AI_PROVIDER=none`. Do not mock the parser. Unknown foods stay unresolved; that is the production boundary. Live Claude/Codex login is out of scope for this isolated harness (`npm run ai:doctor` is the live probe, and it is not this skill).
+- Voice proof must click `Log by voice`, wait for `Listening…`, then `browser speech --value`. Typing into the composer is a different feature (`log-meal`). The speech stub stands in for Chrome's speech service only; do not treat that as a live-mic or Google STT proof.
 
 Minimum files per verified feature:
 
@@ -129,6 +134,7 @@ control-macro browser fill --placeholder "Search foods…" --value Egg
 control-macro browser wait --text "Food database"
 control-macro browser screenshot --path artifacts/<feature>/after.png
 control-macro browser snapshot --aria --path artifacts/<feature>/after.aria.txt
+control-macro browser speech --value "2 eggs and 200g chicken breast"
 control-macro http get --path /api/status
 control-macro cleanup
 ```
