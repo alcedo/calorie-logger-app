@@ -44,6 +44,24 @@ Macro is one Next.js 16 process with one SQLite file and one Claude/Codex CLI ho
 - Vercel tmpdir is one file for the whole instance. Per-user files on Vercel still die on cold start. Keep the path helper, but isolation is for durable hosts (`data/users/<id>/`).
 - Client pages hold entries in React state only. Same-browser user switch needs a full reload after sign-out or the old list can flash.
 
+## Extra constraints from explorers
+
+- `GET /api/status` returns every in-flight AI login (`sessionId`, URL, Codex user code). Any tab can steal a connect-in-progress. Status must become per-user and authenticated.
+- `cancelProvider` kills every Claude or Codex login child in the process. Login maps must key by user.
+- Host `CLAUDE_CODE_OAUTH_TOKEN` and `AI_PROVIDER` beat the settings table and survive disconnect. After SSO those host vars must not override another user's store. Tests may still set them.
+- `dropScratchHomes` deletes `CLAUDE_CONFIG_DIR` / `CODEX_HOME` under `/tmp`. Per-user CLI homes go under `data/users/<id>/`, not `/tmp`.
+- History `dayEntries` and the AI setup-token field live in React state. Logout must full-reload.
+- Client pages do not handle 401. A gate without a login page and fetch `ok` checks will throw on `data.entries`.
+- Playwright, verify-macro, and AGENTS.md smoke assume open APIs. They need a minted session, not a public exception.
+- `CREATE TABLE IF NOT EXISTS` does not migrate existing files. New catalog tables are a new file, not columns on `app.db`.
+- Integration tests call handlers with a `NextRequest`. `cookies()` from `next/headers` throws outside a request scope. Read the session from `req`.
+- Auth must run before the SSE stream opens. `/api/log` streaming is always HTTP 200 after that.
+- `GET /api/goals` takes no request argument today. It must take one if the session comes from `req`.
+- Provider selection is env over setting. Model selection is setting over env. Per-user settings must not get inverted.
+- `claudeChildEnv()` reads `getSetting("claude_oauth_token")`. Per-user env and per-user db resolve together.
+- Entry ids are per-file autoincrement. User B missing A's id is a routing fact, not an extra ownership column.
+- `connect` does not clear `statusCache`. Per-user cache keys must invalidate on connect, or drop the 30s cache.
+
 ## Constraints the design must keep
 
 - Existing meal, foods, goals, history, and AI picker behavior for one signed-in user.
