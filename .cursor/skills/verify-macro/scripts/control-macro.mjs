@@ -204,8 +204,8 @@ async function runDaemon() {
   if (!stateFile) die("daemon missing MACRO_VERIFY_STATE");
   const readyFile = process.env.MACRO_VERIFY_DAEMON_READY;
   const browser = await chromium.launch({ headless: true });
-  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
-  const cookieHeader = String(state.cookie || "");
+  const launchState = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  const cookieHeader = String(launchState.cookie || "");
   const eq = cookieHeader.indexOf("=");
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
@@ -216,7 +216,7 @@ async function runDaemon() {
               {
                 name: cookieHeader.slice(0, eq),
                 value: cookieHeader.slice(eq + 1),
-                domain: new URL(state.url).hostname,
+                domain: new URL(launchState.url).hostname,
                 path: "/",
                 httpOnly: true,
                 secure: false,
