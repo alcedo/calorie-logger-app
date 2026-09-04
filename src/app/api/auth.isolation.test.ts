@@ -9,13 +9,18 @@ setupTempDatabase();
 
 const DATE = "2026-09-04";
 
-type RouteMod = Record<
-  string,
-  (
-    req: ReturnType<typeof jsonRequest>,
-    ctx?: { params: Promise<{ id: string }> },
-  ) => Promise<Response>
->;
+type Handler = (
+  req: ReturnType<typeof jsonRequest>,
+  ctx?: { params: Promise<{ id: string }> },
+) => Promise<Response>;
+
+type RouteMod = {
+  GET?: Handler;
+  POST?: Handler;
+  PATCH?: Handler;
+  PUT?: Handler;
+  DELETE?: Handler;
+};
 
 async function statusOf(
   load: () => Promise<RouteMod>,
@@ -25,7 +30,7 @@ async function statusOf(
   params?: { id: string },
 ): Promise<number> {
   const mod = await load();
-  const handler = mod[method];
+  const handler = mod[method as keyof RouteMod];
   if (!handler) throw new Error(`missing ${method} on ${url}`);
   const req = jsonRequest(method, url, body, { cookie: "" });
   const res = params

@@ -23,13 +23,13 @@ function withPrivateCache(res: Response): Response {
   });
 }
 
-export function withUser<C>(
-  handler: (req: NextRequest, ctx: C) => Response | Promise<Response>,
-): (req: NextRequest, ctx: C) => Promise<Response> {
-  return async (req: NextRequest, ctx: C) => {
+export function withUser<A extends unknown[]>(
+  handler: (req: NextRequest, ...args: A) => Response | Promise<Response>,
+): (req: NextRequest, ...args: A) => Promise<Response> {
+  return async (req: NextRequest, ...args: A) => {
     const user = await requireUser(req);
     if (!user) return unauthorized();
-    const res = await runAsUser(user, () => handler(req, ctx));
+    const res = await runAsUser(user, () => handler(req, ...args));
     return withPrivateCache(res);
   };
 }

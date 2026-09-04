@@ -43,15 +43,21 @@ function handles(): Map<string, Handle> {
 }
 
 export function dataRoot(): string {
-  if (process.env.MACRO_DATA_DIR) return process.env.MACRO_DATA_DIR;
+  if (process.env.MACRO_DATA_DIR) {
+    return /*turbopackIgnore: true*/ process.env.MACRO_DATA_DIR;
+  }
   if (process.env.VERCEL) {
-    return path.join(os.tmpdir(), "calorie-logger", "users");
+    return path.join(
+      /*turbopackIgnore: true*/ os.tmpdir(),
+      "calorie-logger",
+      "users",
+    );
   }
   return path.join(process.cwd(), "data", "users");
 }
 
 export function homeFor(userId: string, dbPath?: string): UserHome {
-  const rootDir = path.join(dataRoot(), userId);
+  const rootDir = path.join(/*turbopackIgnore: true*/ dataRoot(), userId);
   return {
     userId,
     rootDir,
@@ -103,7 +109,7 @@ export function tenantFor(user: AppUser, dbPath?: string): Tenant {
   const home = homeFor(user.id, dbPath);
   fs.mkdirSync(home.claudeConfigDir, { recursive: true });
   fs.mkdirSync(home.codexHome, { recursive: true });
-  if (!fs.existsSync(home.dbPath)) {
+  if (!fs.existsSync(/*turbopackIgnore: true*/ home.dbPath)) {
     claimLegacyAppDb(user.id, home.dbPath);
   }
   const opened = openDatabaseFile(home.dbPath);
