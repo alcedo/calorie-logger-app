@@ -25,10 +25,7 @@ import {
   searchNutritionWeb,
   searchQueryFor,
 } from "@/lib/nutrition-search";
-import {
-  isServerlessHost,
-  SERVERLESS_CLI_DETAIL,
-} from "../runtime";
+import { isServerlessHost } from "../runtime";
 import type { LogTraceListener } from "../log-trace";
 import type {
   AiNutrition,
@@ -123,22 +120,7 @@ function toDto(
   };
 }
 
-async function probeAll(
-  serverlessHost: boolean,
-): Promise<Record<ProviderId, ProviderAvailability>> {
-  if (serverlessHost) {
-    const unavailable = (): ProviderAvailability => ({
-      available: false,
-      detail: SERVERLESS_CLI_DETAIL,
-      reason: "serverless",
-      cliInstalled: false,
-    });
-    return {
-      claude: unavailable(),
-      codex: unavailable(),
-      openai: await openaiProvider.isAvailable(),
-    };
-  }
+async function probeAll(): Promise<Record<ProviderId, ProviderAvailability>> {
   const [claude, codex, openai] = await Promise.all([
     claudeProvider.isAvailable(),
     codexProvider.isAvailable(),
@@ -155,7 +137,7 @@ export async function getAiStatus(): Promise<AiStatusDto> {
 
   const selection = readSelection();
   const serverlessHost = isServerlessHost();
-  const probed = await probeAll(serverlessHost);
+  const probed = await probeAll();
   const providers = (["claude", "codex", "openai"] as const).map((id) =>
     toDto(id, probed[id]),
   );

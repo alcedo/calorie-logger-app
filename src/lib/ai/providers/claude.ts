@@ -20,12 +20,39 @@ import type {
   GenerateJsonRequest,
   ProviderAvailability,
 } from "../types";
+import { readClaudeCredential } from "../credentials";
+import { generateJsonViaClaudeHttp } from "../claude-http";
+import { isServerlessHost } from "../../runtime";
+
+function tokenAvailability(): ProviderAvailability | null {
+  const cred = readClaudeCredential();
+  if (!cred) return null;
+  return {
+    available: true,
+    detail: "Claude subscription token",
+    authMethod: "oauth_token",
+    cliInstalled: false,
+  };
+}
 
 export const claudeProvider: AiProvider = {
   id: "claude",
   label: "Claude Code (subscription)",
 
   async isAvailable(): Promise<ProviderAvailability> {
+    if (isServerlessHost()) {
+      return (
+        tokenAvailability() ?? {
+          available: false,
+          detail:
+            "Paste a Claude setup-token. Vercel cannot spawn Claude Code.",
+          reason: "serverless",
+          cliInstalled: false,
+        }
+      );
+    }
+    const token = tokenAvailability();
+    if (token) return { ...token, cliInstalled: cliIsInstalled(claudeBin(), claudeChildEnv()) };
     const env = claudeChildEnv();
     const command = claudeBin();
     if (!cliIsInstalled(command, env)) {
@@ -82,6 +109,13 @@ export const claudeProvider: AiProvider = {
   },
 
   async generateJson<T>(req: GenerateJsonRequest): Promise<T> {
+    const cred = readClaudeCredential();
+    if (cred) return generateJsonViaClaudeHttp(cred.token, req);
+    if (isServerlessHost()) {
+      throw new Error(
+        "Paste a Claude setup-token. Vercel cannot spawn Claude Code.",
+      );
+    }
     const env = claudeChildEnv();
     const cwd = await mkdtemp(join(tmpdir(), "macro-claude-"));
     try {

@@ -8,10 +8,16 @@ import {
   activeLogins,
   cancelLogin,
   completeClaudeLogin,
+  pollLogin,
+  restoreCodexHttpLogin,
   startClaudeLogin,
   startCodexLogin,
 } from "./login";
 import { SERVERLESS_CONNECT_ERROR } from "../runtime";
+import { setupTempDatabase } from "@/test/helpers";
+import { readCodexCredential } from "./credentials";
+
+setupTempDatabase();
 
 const fixtures = fileURLToPath(new URL("./fixtures", import.meta.url));
 const fakeClaude = join(fixtures, "fake-claude-login.mjs");
@@ -156,13 +162,113 @@ describe("login sessions against fake CLIs", () => {
     assert.equal(activeLogins().length, 0);
   });
 
-  it("refuses Codex login on Vercel without spawning", async () => {
+  it("starts ChatGPT device login on Vercel over HTTP", async () => {
     stashEnv();
     process.env.VERCEL = "1";
     process.env.AI_CODEX_BIN = fakeCodex;
-    process.env.AI_LOGIN_START_WAIT_MS = "2000";
-    await assert.rejects(() => startCodexLogin(), /cannot run on Vercel/);
-    assert.equal(activeLogins().length, 0);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          device_auth_id: "dev-1",
+          user_code: "ABC-DEFG",
+          interval: 30,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      )) as typeof fetch;
+    try {
+      const login = await startCodexLogin();
+      assert.equal(login.provider, "codex");
+      assert.equal(login.userCode, "ABC-DEFG");
+      assert.equal(login.loginUrl, "https://auth.openai.com/codex/device");
+      cancelLogin(login.sessionId);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("advances a ChatGPT HTTP login when the client polls", async () => {
+    stashEnv();
+    process.env.VERCEL = "1";
+    const originalFetch = globalThis.fetch;
+    let step = 0;
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      if (url.includes("/usercode")) {
+        return new Response(
+          JSON.stringify({
+            device_auth_id: "dev-poll",
+            user_code: "POLL-CODE",
+            interval: 1,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (url.includes("/deviceauth/token")) {
+        step += 1;
+        if (step === 1) {
+          return new Response(
+            JSON.stringify({ error: "deviceauth_authorization_pending" }),
+            { status: 400, headers: { "content-type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            authorization_code: "auth-code",
+            code_verifier: "verifier",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (url.includes("/oauth/token")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "access-from-poll",
+            refresh_token: "refresh-from-poll",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("unexpected", { status: 500 });
+    }) as typeof fetch;
+    try {
+      const login = await startCodexLogin();
+      const pending = await pollLogin(login.sessionId);
+      assert.equal(pending?.phase, "awaiting_user");
+      const done = await pollLogin(login.sessionId);
+      assert.equal(done?.phase, "done");
+      assert.equal(readCodexCredential()?.accessToken, "access-from-poll");
+      assert.equal(activeLogins().length, 0);
+      const { clearCodexAuth } = await import("./credentials");
+      clearCodexAuth();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("revives a ChatGPT HTTP login from stored device state", async () => {
+    stashEnv();
+    process.env.VERCEL = "1";
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({ error: "deviceauth_authorization_pending" }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      )) as typeof fetch;
+    try {
+      const restored = restoreCodexHttpLogin({
+        sessionId: "revived-session",
+        deviceAuthId: "dev-revived",
+        userCode: "REVIVE",
+        expiresAt: Date.now() + 60_000,
+      });
+      assert.equal(restored?.userCode, "REVIVE");
+      const pending = await pollLogin("revived-session");
+      assert.equal(pending?.phase, "awaiting_user");
+      cancelLogin("revived-session");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("maps a missing Claude binary to a readable error (not spawn ENOENT)", async () => {

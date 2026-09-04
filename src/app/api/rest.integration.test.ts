@@ -303,11 +303,24 @@ describe("history and status APIs", () => {
       expect(body.error).toBe(SERVERLESS_CONNECT_ERROR);
 
       const token = await POST(
-        jsonRequest("POST", "/api/ai", { action: "token", token: "x".repeat(20) }),
+        jsonRequest("POST", "/api/ai", {
+          action: "token",
+          token: "sk-ant-oat-integration-test",
+        }),
       );
-      const tokenRes = await readJson<{ error: string }>(token);
-      expect(tokenRes.status).toBe(400);
-      expect(tokenRes.body.error).toBe(SERVERLESS_CONNECT_ERROR);
+      const tokenRes = await readJson<{
+        status: { provider: string | null; aiAvailable: boolean };
+      }>(token);
+      expect(tokenRes.status).toBe(200);
+      expect(tokenRes.body.status.aiAvailable).toBe(true);
+      expect(tokenRes.body.status.provider).toBe("claude");
+
+      await POST(
+        jsonRequest("POST", "/api/ai", {
+          action: "disconnect",
+          provider: "claude",
+        }),
+      );
     } finally {
       if (originalVercel === undefined) delete process.env.VERCEL;
       else process.env.VERCEL = originalVercel;

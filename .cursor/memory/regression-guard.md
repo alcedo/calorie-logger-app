@@ -25,7 +25,7 @@ These encode product requirements. Deleting, skipping, or weakening them is BLOC
 ## Hidden coupling
 
 - Food lookup is local SQLite first (`findFood` / aliases / fuzzy), then AI fallback; AI hits are cached back into `foods`. Changing normalize/fuzzy matching silently retargets logs onto the wrong food.
-- `AI_PROVIDER=auto` must not pick OpenAI on a local host even if `OPENAI_API_KEY` is set. On Vercel (`VERCEL=1`) auto uses the key because Claude and Codex cannot spawn.
+- `AI_PROVIDER=auto` must not pick OpenAI on a local host even if `OPENAI_API_KEY` is set. On Vercel, auto prefers a Claude or ChatGPT subscription token over HTTP, then `OPENAI_API_KEY`.
 - Next.js in this repo has breaking APIs vs training data; check `node_modules/next/dist/docs/` before treating App Router / config changes as equivalent to older Next.
 - Integration tests use a temp SQLite DB, not `data/app.db`. Don't treat a missing `data/app.db` as a test failure.
 - Meal persist logic lives in `src/lib/log-meal.ts` (not only `src/app/api/log/route.ts`). Mocking `@/lib/ai` still works for log tests because `log-meal` imports those symbols.

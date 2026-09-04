@@ -6,10 +6,10 @@ export function isServerlessHost(
 }
 
 export const SERVERLESS_CLI_DETAIL =
-  "Claude Code and Codex CLIs cannot run on Vercel. Set OPENAI_API_KEY to look up unknown foods, or run the app on a machine with the CLI.";
+  "Claude Code and Codex CLIs cannot spawn on Vercel. Paste a Claude setup-token or connect ChatGPT. Those credentials call your subscription over HTTP.";
 
 export const SERVERLESS_NONE_BANNER =
-  "AI lookup on Vercel requires the OpenAI API. Set OPENAI_API_KEY.";
+  "AI lookup on Vercel needs a Claude setup-token, a ChatGPT login, or OPENAI_API_KEY.";
 
 export const SERVERLESS_CONNECT_ERROR =
-  "Claude and ChatGPT CLI logins cannot run on Vercel. Set OPENAI_API_KEY instead.";
+  "Claude CLI login cannot run on Vercel. Paste a setup-token from `claude setup-token` instead.";

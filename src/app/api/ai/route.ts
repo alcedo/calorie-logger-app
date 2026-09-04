@@ -3,8 +3,10 @@ import { clearAiStatusCache, getAiStatus } from "@/lib/ai";
 import {
   cancelLogin,
   completeClaudeLogin,
-  getLogin,
+  codexDeviceState,
   logoutProvider,
+  pollLogin,
+  restoreCodexHttpLogin,
   startClaudeLogin,
   startCodexLogin,
   type LoginKind,
@@ -14,13 +16,21 @@ import { validateClaudeSetupToken } from "@/lib/ai/setup-token";
 import { publicCliErrorMessage } from "@/lib/ai/run-cli";
 import { isServerlessHost, SERVERLESS_CONNECT_ERROR } from "@/lib/runtime";
 import {
+  persistClaudeToken,
+} from "@/lib/ai/credentials";
+import {
+  readCodexDeviceCookie,
+  syncCredentialCookies,
+  withRequestCookies,
+  writeCodexDeviceCookie,
+} from "@/lib/ai/request-cookies";
+import {
   deleteSetting,
   setSetting,
   SETTING_AI_CLAUDE_MODEL,
   SETTING_AI_CODEX_MODEL,
   SETTING_AI_OPENAI_MODEL,
   SETTING_AI_PROVIDER,
-  SETTING_CLAUDE_OAUTH_TOKEN,
 } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -38,19 +48,22 @@ export async function POST(req: NextRequest) {
   try {
     switch (action) {
       case "connect": {
-        if (isServerlessHost()) {
+        if (!isKind(body?.provider)) {
+          return NextResponse.json({ error: "provider must be claude or codex" }, { status: 400 });
+        }
+        if (body.provider === "claude" && isServerlessHost()) {
           return NextResponse.json(
             { error: SERVERLESS_CONNECT_ERROR },
             { status: 400 },
           );
         }
-        if (!isKind(body?.provider)) {
-          return NextResponse.json({ error: "provider must be claude or codex" }, { status: 400 });
-        }
         const login =
           body.provider === "claude"
             ? await startClaudeLogin()
             : await startCodexLogin();
+        if (login.provider === "codex") {
+          await writeCodexDeviceCookie(codexDeviceState(login.sessionId));
+        }
         return NextResponse.json({ login });
       }
       case "complete": {
@@ -58,21 +71,36 @@ export async function POST(req: NextRequest) {
         const code = String(body?.code ?? "");
         const login = await completeClaudeLogin(sessionId, code);
         clearAiStatusCache();
-        const status = await getAiStatus();
+        const status = await withRequestCookies(() => getAiStatus());
         return NextResponse.json({ login, status });
       }
       case "poll": {
         const sessionId = String(body?.sessionId ?? "");
-        const login = getLogin(sessionId);
+        const stored = await readCodexDeviceCookie();
+        if (stored?.sessionId === sessionId) {
+          restoreCodexHttpLogin(stored);
+        }
+        const login = await pollLogin(sessionId);
         if (!login) {
           return NextResponse.json({ error: "No such login session" }, { status: 404 });
         }
-        if (login.phase === "done") clearAiStatusCache();
-        const status = login.phase === "done" ? await getAiStatus() : undefined;
+        if (login.phase === "done") {
+          clearAiStatusCache();
+          await writeCodexDeviceCookie(null);
+          await syncCredentialCookies();
+        }
+        if (login.phase === "failed") {
+          await writeCodexDeviceCookie(null);
+        }
+        const status =
+          login.phase === "done"
+            ? await withRequestCookies(() => getAiStatus())
+            : undefined;
         return NextResponse.json({ login, status });
       }
       case "cancel": {
         cancelLogin(String(body?.sessionId ?? ""));
+        await writeCodexDeviceCookie(null);
         return NextResponse.json({ ok: true });
       }
       case "disconnect": {
@@ -80,24 +108,21 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "provider must be claude or codex" }, { status: 400 });
         }
         await logoutProvider(body.provider);
-        if (body.provider === "claude") deleteSetting(SETTING_CLAUDE_OAUTH_TOKEN);
         clearAiStatusCache();
-        return NextResponse.json({ status: await getAiStatus() });
+        const status = await withRequestCookies(() => getAiStatus());
+        await syncCredentialCookies();
+        return NextResponse.json({ status });
       }
       case "token": {
-        if (isServerlessHost()) {
-          return NextResponse.json(
-            { error: SERVERLESS_CONNECT_ERROR },
-            { status: 400 },
-          );
-        }
         const parsed = validateClaudeSetupToken(String(body?.token ?? ""));
         if (!parsed.ok) {
           return NextResponse.json({ error: parsed.error }, { status: 400 });
         }
-        setSetting(SETTING_CLAUDE_OAUTH_TOKEN, parsed.token);
+        persistClaudeToken(parsed.token);
         clearAiStatusCache();
-        return NextResponse.json({ status: await getAiStatus() });
+        const status = await withRequestCookies(() => getAiStatus());
+        await syncCredentialCookies();
+        return NextResponse.json({ status });
       }
       case "preference": {
         const selection = String(body?.selection ?? "").toLowerCase();
@@ -140,7 +165,9 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Invalid preference" }, { status: 400 });
         }
         clearAiStatusCache();
-        return NextResponse.json({ status: await getAiStatus() });
+        return NextResponse.json({
+          status: await withRequestCookies(() => getAiStatus()),
+        });
       }
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });

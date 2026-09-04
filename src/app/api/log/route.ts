@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logMeal } from "@/lib/log-meal";
 import { encodeSse, wantsStream } from "@/lib/log-trace";
+import {
+  syncCredentialCookies,
+  withRequestCookies,
+} from "@/lib/ai/request-cookies";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,7 +35,10 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(encodeSse(event)));
         };
         try {
-          const result = await logMeal({ text, date, onEvent: send });
+          const result = await withRequestCookies(() =>
+            logMeal({ text, date, onEvent: send }),
+          );
+          await syncCredentialCookies();
           if (result.logged.length === 0 && result.unresolved.length === 0) {
             send({
               type: "error",
@@ -58,7 +65,8 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const result = await logMeal({ text, date });
+  const result = await withRequestCookies(() => logMeal({ text, date }));
+  await syncCredentialCookies();
   if (result.logged.length === 0 && result.unresolved.length === 0) {
     return NextResponse.json(
       { error: "Could not find any foods in that message", trace: result.trace },

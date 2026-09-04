@@ -166,14 +166,16 @@ export default function AiPage() {
         <h1 className="text-lg font-semibold text-zinc-100">AI connections</h1>
         <p className="mt-1 text-sm text-zinc-400">
           {serverless
-            ? "Unknown foods look up through the OpenAI API on this host. Claude and ChatGPT CLI logins cannot run on Vercel."
+            ? "Bring your Claude or ChatGPT subscription. Paste a Claude setup-token or connect ChatGPT. This host calls those APIs over HTTP because it cannot spawn the CLIs."
             : "Link the Claude or ChatGPT subscription you already pay for. No API keys. Unknown foods then look up automatically — the model searches USDA, Open Food Facts, and the web, and you can watch its thought process while logging."}
         </p>
         {serverless ? (
           <p className="mt-2 text-sm text-amber-300/90">
-            This server is on Vercel. Claude Code and Codex CLIs cannot run
-            here. Set <code>OPENAI_API_KEY</code> to look up unknown foods.
-            Auto uses that key on this host.
+            On a computer with Claude Code, run <code>claude setup-token</code>{" "}
+            and paste it below. ChatGPT uses the same device login as Codex.
+            You can also set <code>CLAUDE_CODE_OAUTH_TOKEN</code> or{" "}
+            <code>CODEX_AUTH_JSON</code> on the Vercel project so a cold start
+            keeps the credential.
           </p>
         ) : anyCliMissing ? (
           <p className="mt-2 text-sm text-amber-300/90">
@@ -213,11 +215,9 @@ export default function AiPage() {
                 ? claude?.subscriptionType
                   ? claude.subscriptionType
                   : "Connected"
-                : serverless
-                  ? "Unavailable on Vercel"
-                  : claudeCliMissing
-                    ? "CLI not installed"
-                    : "Not connected"
+                : claudeCliMissing
+                  ? "CLI not installed"
+                  : "Not connected"
             }
           />
         </div>
@@ -281,18 +281,25 @@ export default function AiPage() {
               </button>
             )}
           </div>
+        ) : claudeOn ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => disconnect("claude")}
+              className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300"
+            >
+              Disconnect
+            </button>
+          </div>
         ) : null}
 
-        {!serverless && (
-          <button
-            type="button"
-            onClick={() => setShowToken((v) => !v)}
-            className="mt-3 text-xs text-zinc-500 underline"
-          >
-            {showToken ? "Hide setup-token" : "I already have a claude setup-token"}
-          </button>
-        )}
-        {!serverless && showToken && (
+        <button
+          type="button"
+          onClick={() => setShowToken((v) => !v)}
+          className="mt-3 text-xs text-zinc-500 underline"
+        >
+          {showToken ? "Hide setup-token" : "I already have a claude setup-token"}
+        </button>
+        {showToken && (
           <div className="mt-2 space-y-2">
             <p className="text-xs text-zinc-500">
               On a computer with Claude Code, run <code>claude setup-token</code> and
@@ -332,16 +339,14 @@ export default function AiPage() {
             label={
               codexOn
                 ? "Connected"
-                : serverless
-                  ? "Unavailable on Vercel"
-                  : codexCliMissing
-                    ? "CLI not installed"
-                    : "Not connected"
+                : codexCliMissing
+                  ? "CLI not installed"
+                  : "Not connected"
             }
           />
         </div>
 
-        {!serverless && login?.provider === "codex" ? (
+        {login?.provider === "codex" ? (
           <div className="mt-4 space-y-3">
             <p className="text-sm text-zinc-300">
               1. Open ChatGPT device login and sign in.
@@ -369,12 +374,12 @@ export default function AiPage() {
               Cancel
             </button>
           </div>
-        ) : !serverless ? (
+        ) : (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => connect("codex")}
-              disabled={busy === "codex" || codexConnectBlocked}
+              disabled={busy === "codex" || (!serverless && codexConnectBlocked)}
               title={codexCliMissing ? codex?.detail : undefined}
               className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:opacity-100"
             >
@@ -389,14 +394,14 @@ export default function AiPage() {
               </button>
             )}
           </div>
-        ) : null}
+        )}
       </section>
 
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
         <h2 className="text-sm font-semibold text-zinc-200">Provider and model</h2>
         <p className="mt-1 text-xs text-zinc-500">
           {serverless
-            ? "On Vercel, Auto uses the OpenAI API key. Claude and ChatGPT logins are unavailable."
+            ? "Auto picks a pasted Claude token, then a ChatGPT login, then OPENAI_API_KEY."
             : "Choose which connected subscription (or paid OpenAI key) to use, and which model it should call. Auto picks Claude if it is signed in, otherwise ChatGPT."}
         </p>
         <div className="mt-4">

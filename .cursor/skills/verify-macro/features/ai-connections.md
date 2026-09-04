@@ -36,5 +36,5 @@ Preconditions:
 - This skill does not complete a live Claude or ChatGPT login. Do not start `connect` against a real CLI here; use `npm run ai:doctor` outside this harness.
 - Connect is disabled because launch points `AI_CLAUDE_BIN` and `AI_CODEX_BIN` at missing files. A developer machine with real CLIs on PATH is a different configuration — do not treat that as this recipe.
 - OpenAI API is a paid opt-in. Local auto never selects it. The OpenAI option stays disabled without `OPENAI_API_KEY`.
-- A `VERCEL=1` host is a different configuration. That surface hides Connect and does not show PATH or "CLI not installed" copy. Do not use this launch recipe as the Vercel proof.
+- A `VERCEL=1` host is a different configuration. Connect Claude stays hidden. Setup-token and Connect ChatGPT stay visible. Do not use this launch recipe as the Vercel proof.
 - The Today banner is a link. The accessible name to click is `Connect AI`, not the whole banner paragraph.

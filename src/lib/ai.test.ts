@@ -27,6 +27,7 @@ describe("ai module", () => {
   const ORIGINAL_MODEL = process.env.OPENAI_MODEL;
   const ORIGINAL_PROVIDER = process.env.AI_PROVIDER;
   const ORIGINAL_VERCEL = process.env.VERCEL;
+  const ORIGINAL_CLAUDE_TOKEN = process.env.CLAUDE_CODE_OAUTH_TOKEN;
 
   beforeEach(async () => {
     createMock.mockReset();
@@ -42,6 +43,7 @@ describe("ai module", () => {
     delete process.env.OPENAI_API_KEY;
     delete process.env.AI_PROVIDER;
     delete process.env.VERCEL;
+    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
     vi.resetModules();
     const { clearAiStatusCache } = await import("./ai");
     clearAiStatusCache();
@@ -56,6 +58,9 @@ describe("ai module", () => {
     else process.env.AI_PROVIDER = ORIGINAL_PROVIDER;
     if (ORIGINAL_VERCEL === undefined) delete process.env.VERCEL;
     else process.env.VERCEL = ORIGINAL_VERCEL;
+    if (ORIGINAL_CLAUDE_TOKEN === undefined) {
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    } else process.env.CLAUDE_CODE_OAUTH_TOKEN = ORIGINAL_CLAUDE_TOKEN;
   });
 
   it("does not treat OPENAI_API_KEY as available under auto", async () => {
@@ -83,6 +88,17 @@ describe("ai module", () => {
     expect(status.providers.find((p) => p.id === "codex")?.detail).not.toMatch(
       /PATH/,
     );
+  });
+
+  it("auto selects Claude on Vercel when a setup-token is set", async () => {
+    process.env.VERCEL = "1";
+    process.env.OPENAI_API_KEY = "test-key";
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "sk-ant-oat-test";
+    const { getAiStatus } = await import("./ai");
+    const status = await getAiStatus();
+    expect(status.aiAvailable).toBe(true);
+    expect(status.provider).toBe("claude");
+    expect(status.serverlessHost).toBe(true);
   });
 
   it("auto stays unavailable on Vercel without a key", async () => {
