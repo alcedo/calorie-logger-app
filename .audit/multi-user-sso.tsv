@@ -1,0 +1,7 @@
+ts	phase	decision	why	evidence	result
+2026-09-04T00:44:52Z	frame	stated the exit predicate in .audit/frame.md	a vague done stalls an overnight run so the stop rule has to be checkable	.audit/frame.md	open
+2026-09-04T00:44:52Z	frame	chose separate SQLite files plus a small user catalog	the request asked for each user to have their own database, not a shared table with a user column	.audit/frame.md	open
+2026-09-04T00:44:52Z	frame	Google SSO in production, signed test sessions for CI and this box	this environment has no Google OAuth client so live SSO cannot be the only proof	env has no GOOGLE_CLIENT_ID	open
+2026-09-04T00:44:52Z	how	wrote grounding from the current single-user singleton db and shared Claude CLI home	architect needs a traced model before sketches; explorer agents are still reading	.audit/grounding.md	INCONCLUSIVE until explorers return
+2026-09-04T00:46:15Z	harness	added failing isolation tests for 401 and two-user split	capture the old open APIs before changing them so the check reads old vs new	src/app/api/auth.isolation.test.ts vitest 2 failed: [200,200,404...] vs 401; missing @/lib/auth/session	NOT VERIFIED
+2026-09-04T00:46:15Z	loop	armed cursor-subscriptions timer loop-multi-user-sso at 1200s	cloud loop cannot use a local sleep; first pass already ran	subscriptionId sub_ee279224-fc06-4743-a162-699b19ea804e	armed
