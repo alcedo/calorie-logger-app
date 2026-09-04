@@ -1,6 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 
+process.env.AUTH_SECRET ??= "vitest-auth-secret-32bytes-minimum!!";
+process.env.AUTH_TEST_MINT ??= "1";
+
 vi.mock("@/lib/ai/providers/claude", () => ({
   claudeProvider: {
     id: "claude",

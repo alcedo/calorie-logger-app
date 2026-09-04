@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { currentTenantOrNull } from "@/lib/tenant";
 import { getSetting, SETTING_CLAUDE_OAUTH_TOKEN } from "../settings";
 
 /**
@@ -70,21 +71,28 @@ export function codexBin(): string {
   return resolveBin("codex", process.env.AI_CODEX_BIN);
 }
 
+function assignTenantHomes(env: NodeJS.ProcessEnv): void {
+  const home = currentTenantOrNull()?.home;
+  if (!home) return;
+  env.CLAUDE_CONFIG_DIR = home.claudeConfigDir;
+  env.CODEX_HOME = home.codexHome;
+}
+
 export function claudeChildEnv(): NodeJS.ProcessEnv {
   const env = withLocalBin({ ...process.env });
   dropScratchHomes(env);
   sanitizeHostEnv(env);
   delete env.ANTHROPIC_API_KEY;
   delete env.ANTHROPIC_AUTH_TOKEN;
+  delete env.CLAUDE_CODE_OAUTH_TOKEN;
   let stored: string | undefined;
   try {
     stored = getSetting(SETTING_CLAUDE_OAUTH_TOKEN);
   } catch {
     stored = undefined;
   }
-  const token = process.env.CLAUDE_CODE_OAUTH_TOKEN || stored;
-  delete env.CLAUDE_CODE_OAUTH_TOKEN;
-  if (token) env.CLAUDE_CODE_OAUTH_TOKEN = token;
+  if (stored) env.CLAUDE_CODE_OAUTH_TOKEN = stored;
+  assignTenantHomes(env);
   return env;
 }
 
@@ -94,6 +102,7 @@ export function codexChildEnv(): NodeJS.ProcessEnv {
   sanitizeHostEnv(env);
   delete env.OPENAI_API_KEY;
   delete env.CODEX_API_KEY;
+  assignTenantHomes(env);
   return env;
 }
 

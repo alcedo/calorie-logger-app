@@ -11,3 +11,5 @@ ts	phase	decision	why	evidence	result
 2026-09-04T00:56:48Z	how	explainer wrote .audit/how.md	grounding for architect is now a traced document, not explorer notes alone	.audit/how.md	VERIFIED file exists
 2026-09-04T00:57:15Z	how	kept session-on-req, auth-before-SSE, and goals GET taking a request	the explainer checked next/headers throws in handler-only tests	.audit/how.md	grounding updated
 2026-09-04T01:04:57Z	arena	picked candidate 3 as base, ALS packages as grafts only	overlapping requests need a visible owner; C2 is the same idea with extra catalog machinery	.audit/design.md	pick recorded, judge still running
+2026-09-04T01:23:09Z	pick	base is candidate 1 with Auth.js JWT grafts	cross-judge rejected C3 dual UserId and per-handler requireScope	/tmp/arena-multi-user/JUDGE.md .audit/design.md	VERIFIED judge file + isolation tests later green
+2026-09-04T01:23:09Z	impl	withUser plus per-user sqlite and AI slots	fail-closed db and separate files were the exit predicate	src/lib/auth src/lib/tenant.ts src/db/open.ts	VERIFIED isolation + npm test 183 passed

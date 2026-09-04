@@ -1,4 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { userIdFromEmail } from "@/lib/auth/session";
+import { dataRoot } from "@/lib/tenant";
 import { jsonRequest, readJson, setupTempDatabase } from "@/test/helpers";
 
 setupTempDatabase();
@@ -23,7 +27,7 @@ async function statusOf(
   const mod = await load();
   const handler = mod[method];
   if (!handler) throw new Error(`missing ${method} on ${url}`);
-  const req = jsonRequest(method, url, body);
+  const req = jsonRequest(method, url, body, { cookie: "" });
   const res = params
     ? await handler(req, { params: Promise.resolve(params) })
     : await handler(req);
@@ -85,6 +89,7 @@ describe("unauthenticated data APIs", () => {
         action: "preference",
         selection: "none",
       }),
+      statusOf(() => import("@/app/api/me/route"), "GET", "/api/me"),
     ];
 
     const statuses = await Promise.all(cases);
@@ -163,5 +168,11 @@ describe("two users do not share logs", () => {
     );
     const aBody = await readJson<{ entries: Array<{ id: number }> }>(aDay);
     expect(aBody.body.entries.map((e) => e.id)).toContain(entryId);
+
+    const aDb = path.join(dataRoot(), userIdFromEmail("a@example.com"), "app.db");
+    const bDb = path.join(dataRoot(), userIdFromEmail("b@example.com"), "app.db");
+    expect(aDb).not.toBe(bDb);
+    expect(fs.existsSync(aDb)).toBe(true);
+    expect(fs.existsSync(bDb)).toBe(true);
   });
 });

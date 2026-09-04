@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { foods } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { withUser } from "@/lib/auth";
 import { normalizeFoodName } from "@/lib/normalize";
 
 const NUMERIC_FIELDS = [
@@ -15,10 +16,10 @@ const NUMERIC_FIELDS = [
   "sodium",
 ] as const;
 
-export async function PATCH(
+export const PATCH = withUser(async (
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { params }: { params: Promise<{ id: string }> },
+) => {
   const { id } = await params;
   const body = await req.json().catch(() => null);
   if (!body) {
@@ -53,12 +54,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Food not found" }, { status: 404 });
   }
   return NextResponse.json({ food: updated });
-}
+});
 
-export async function DELETE(
+export const DELETE = withUser(async (
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { params }: { params: Promise<{ id: string }> },
+) => {
   const { id } = await params;
   const deleted = db
     .delete(foods)
@@ -69,4 +70,4 @@ export async function DELETE(
     return NextResponse.json({ error: "Food not found" }, { status: 404 });
   }
   return NextResponse.json({ deleted });
-}
+});

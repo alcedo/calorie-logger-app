@@ -7,6 +7,7 @@ import {
   PARSE_SYSTEM,
   NUTRITION_SYSTEM,
 } from "./schemas";
+import { currentTenantOrNull, slot } from "@/lib/tenant";
 import { hasStrayAnthropicKey } from "./env";
 import { activeLogins } from "./login";
 import { resolveAiStatusView } from "./select";
@@ -87,17 +88,18 @@ const PROVIDERS: Record<ProviderId, AiProvider> = {
 
 const STATUS_TTL_MS = 30_000;
 
-let statusCache: { at: number; value: AiStatusDto } | null = null;
+type StatusCache = { at: number; value: AiStatusDto } | null;
+
+function statusCacheBox(): { current: StatusCache } {
+  return slot("ai-status-cache", () => ({ current: null as StatusCache }));
+}
 
 function readSelection(): AiSelection | "invalid" {
-  const raw = (
-    process.env.AI_PROVIDER ||
-    getSetting(SETTING_AI_PROVIDER) ||
-    "auto"
-  )
-    .trim()
-    .toLowerCase();
+  const envRaw = (process.env.AI_PROVIDER ?? "").trim().toLowerCase();
+  const stored = (getSetting(SETTING_AI_PROVIDER) || "auto").trim().toLowerCase();
+  const raw = envRaw || stored || "auto";
   if (!raw || raw === "auto") return "auto";
+  if (raw === "openai" && envRaw !== "openai") return "auto";
   if (raw === "none" || raw === "claude" || raw === "codex" || raw === "openai") {
     return raw;
   }
@@ -130,8 +132,9 @@ async function probeAll(): Promise<Record<ProviderId, ProviderAvailability>> {
 
 export async function getAiStatus(): Promise<AiStatusDto> {
   const now = Date.now();
-  if (statusCache && now - statusCache.at < STATUS_TTL_MS) {
-    return statusCache.value;
+  const cache = statusCacheBox();
+  if (cache.current && now - cache.current.at < STATUS_TTL_MS) {
+    return cache.current.value;
   }
 
   const selection = readSelection();
@@ -171,12 +174,17 @@ export async function getAiStatus(): Promise<AiStatusDto> {
         ? labelForModel(view.provider, activeModel)
         : null,
   };
-  statusCache = { at: now, value };
+  cache.current = { at: now, value };
   return value;
 }
 
 export function clearAiStatusCache(): void {
-  statusCache = null;
+  const tenant = currentTenantOrNull();
+  if (!tenant) return;
+  const box = tenant.slots.get("ai-status-cache") as
+    | { current: StatusCache }
+    | undefined;
+  if (box) box.current = null;
 }
 
 export async function aiAvailable(): Promise<boolean> {

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { entries } from "@/db/schema";
 import { sql, desc, gte } from "drizzle-orm";
+import { withUser } from "@/lib/auth";
 
-export async function GET(req: NextRequest) {
+export const GET = withUser(async (req: NextRequest) => {
   const days = Math.min(
     Math.max(Number(req.nextUrl.searchParams.get("days")) || 30, 1),
     365
@@ -28,4 +29,4 @@ export async function GET(req: NextRequest) {
     .all();
 
   return NextResponse.json({ days: rows });
-}
+});

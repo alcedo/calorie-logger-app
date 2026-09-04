@@ -85,7 +85,49 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function waitForHttp(url, timeoutMs, nextLog) {
+async function mintVerifySession(authSecret) {
+  const result = await new Promise((resolve, reject) => {
+    const child = spawn(
+      "npx",
+      ["tsx", "scripts/mint-test-session.ts", "verify@local.test", "Verify"],
+      {
+        cwd: REPO_ROOT,
+        env: {
+          ...process.env,
+          AUTH_SECRET: authSecret,
+          AUTH_TEST_MINT: "1",
+          NODE_ENV: "test",
+        },
+      },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`mint-test-session failed: ${stderr || stdout}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+  if (!result?.cookie || !result?.userId) {
+    throw new Error("mint-test-session returned no cookie");
+  }
+  return result;
+}
+
+async function waitForHttp(url, timeoutMs, nextLog, cookie) {
   const start = Date.now();
   let last = "";
   while (Date.now() - start < timeoutMs) {
@@ -98,7 +140,10 @@ async function waitForHttp(url, timeoutMs, nextLog) {
       }
     }
     try {
-      const res = await fetch(url, { redirect: "manual" });
+      const res = await fetch(url, {
+        redirect: "manual",
+        headers: cookie ? { cookie } : {},
+      });
       if (res.ok || (res.status >= 200 && res.status < 500)) return res.status;
       last = `HTTP ${res.status}`;
     } catch (err) {
@@ -159,8 +204,28 @@ async function runDaemon() {
   if (!stateFile) die("daemon missing MACRO_VERIFY_STATE");
   const readyFile = process.env.MACRO_VERIFY_DAEMON_READY;
   const browser = await chromium.launch({ headless: true });
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  const cookieHeader = String(state.cookie || "");
+  const eq = cookieHeader.indexOf("=");
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
+    storageState:
+      eq > 0
+        ? {
+            cookies: [
+              {
+                name: cookieHeader.slice(0, eq),
+                value: cookieHeader.slice(eq + 1),
+                domain: new URL(state.url).hostname,
+                path: "/",
+                httpOnly: true,
+                secure: false,
+                sameSite: "Lax",
+              },
+            ],
+            origins: [],
+          }
+        : undefined,
   });
   // Chromium has no Web Speech service. This stub is the same production
   // boundary Chrome would fill; the app still owns start/stop/transcript UI.
@@ -329,12 +394,19 @@ async function cmdLaunch(flags) {
     : await findFreePort(4173);
   const dir = path.join(os.tmpdir(), `macro-verify-${runId}`);
   fs.mkdirSync(dir, { recursive: true });
-  const dbPath = path.join(dir, "app.db");
+  const usersDir = path.join(dir, "users");
+  fs.mkdirSync(usersDir, { recursive: true });
   const distDir = `.next-verify-${runId}`;
   const url = `http://${host}:${port}`;
   const nextLog = path.join(dir, "next.log");
   const daemonLog = path.join(dir, "daemon.log");
   const readyFile = path.join(dir, "daemon.ready");
+  const authSecret =
+    process.env.AUTH_SECRET && process.env.AUTH_SECRET.length >= 32
+      ? process.env.AUTH_SECRET
+      : "verify-macro-auth-secret-32bytes!!";
+  const minted = await mintVerifySession(authSecret);
+  const dbPath = path.join(usersDir, minted.userId, "app.db");
 
   const nextOut = fs.openSync(nextLog, "w");
   const child = spawn(
@@ -346,7 +418,9 @@ async function cmdLaunch(flags) {
       stdio: ["ignore", nextOut, nextOut],
       env: {
         ...process.env,
-        CALORIE_LOGGER_DB_PATH: dbPath,
+        MACRO_DATA_DIR: usersDir,
+        AUTH_SECRET: authSecret,
+        AUTH_TEST_MINT: "1",
         NEXT_DIST_DIR: distDir,
         AI_PROVIDER: "none",
         AI_CLAUDE_BIN: FAKE_CLAUDE,
@@ -366,6 +440,8 @@ async function cmdLaunch(flags) {
     host,
     port,
     dbPath,
+    cookie: minted.cookie,
+    userId: minted.userId,
     distDir,
     pid: child.pid,
     aiProvider: "none",
@@ -389,7 +465,7 @@ async function cmdLaunch(flags) {
 
   try {
     await waitForHttp(url, 120_000, nextLog);
-    await waitForHttp(`${url}/api/status`, 30_000, nextLog);
+    await waitForHttp(`${url}/api/status`, 30_000, nextLog, minted.cookie);
   } catch (err) {
     try {
       process.kill(-child.pid, "SIGTERM");
@@ -460,7 +536,9 @@ async function cmdDoctor() {
     problems.push(`GET ${state.url} failed: ${err instanceof Error ? err.message : err}`);
   }
   try {
-    const res = await fetch(`${state.url}/api/status`);
+    const res = await fetch(`${state.url}/api/status`, {
+      headers: state.cookie ? { cookie: state.cookie } : {},
+    });
     status = await res.json();
     if (status.bannerKind !== "none") {
       problems.push(
@@ -522,6 +600,7 @@ async function cmdHttp(method, flags) {
   const state = readState();
   const url = new URL(flags.path || "/", state.url).toString();
   const headers = { Accept: "application/json" };
+  if (state.cookie) headers.cookie = state.cookie;
   const init = { method, headers };
   if (flags.json) {
     headers["Content-Type"] = "application/json";

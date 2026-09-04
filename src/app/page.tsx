@@ -14,6 +14,7 @@ import {
   type MacroTotalsDto,
 } from "@/lib/types";
 import type { AiStatusDto, ProviderId } from "@/lib/ai/types";
+import { apiFetch } from "@/lib/api";
 import { logMealFromClient } from "@/lib/log-client";
 import type { LogTraceEvent } from "@/lib/log-trace";
 
@@ -36,7 +37,7 @@ export default function TodayPage() {
   const [trace, setTrace] = useState<LogTraceEvent[]>([]);
 
   const refresh = useCallback(() => {
-    return fetch(`/api/entries?date=${todayLocalDate()}`)
+    return apiFetch(`/api/entries?date=${todayLocalDate()}`)
       .then((res) => res.json())
       .then((data) => {
         setEntries(data.entries);
@@ -46,7 +47,7 @@ export default function TodayPage() {
   }, []);
 
   const refreshStatus = useCallback(() => {
-    return fetch("/api/status")
+    return apiFetch("/api/status")
       .then((r) => r.json())
       .then((d: AiStatusDto) => setAiStatus(d))
       .catch(() => setAiStatus(null));
@@ -65,7 +66,7 @@ export default function TodayPage() {
     selection?: string;
     models?: Partial<Record<ProviderId, string>>;
   }) {
-    const res = await fetch("/api/ai", {
+    const res = await apiFetch("/api/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "preference", ...patch }),

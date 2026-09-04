@@ -5,7 +5,7 @@ description: Drive the Macro calorie-logger web UI (Today, History, Foods, AI, v
 
 # Verify Macro
 
-Macro is a single-user Next.js calorie logger. The primary surface is the web UI at `/` (Today), `/history`, `/foods`, and `/ai`. REST routes exist for the same data; they are a second view for persistence, not a substitute for the user path.
+Macro is a multi-user Next.js calorie logger. The primary surface is the web UI at `/` (Today), `/history`, `/foods`, and `/ai`. Production sign-in is Google. This harness mints a test session. REST routes exist for the same data; they are a second view for persistence, not a substitute for the user path.
 
 Put `control-macro` on `PATH` (or invoke it as `.cursor/skills/verify-macro/bin/control-macro` from the repo root). Every command below is literal.
 
@@ -23,9 +23,10 @@ eval "$(control-macro launch | node -e 'let s="";process.stdin.on("data",d=>s+=d
 
 `launch` prints JSON including `url`, `dbPath`, `state`, and `export`. Run the `export MACRO_VERIFY_STATE=...` line (or set it from the JSON) so later commands talk to this run.
 
-Ready when `GET $URL` and `GET $URL/api/status` answer. The Next log is `$TMP/macro-verify-$RUN_ID/next.log`. The browser daemon needs Playwright Chromium (`npx playwright install chromium` from the repo root if launch fails on the daemon). Env pinned by launch:
+Ready when `GET $URL` and an authenticated `GET $URL/api/status` answer. Launch mints a test session (`AUTH_TEST_MINT=1`) and stores the cookie on the browser and HTTP helper. The Next log is `$TMP/macro-verify-$RUN_ID/next.log`. The browser daemon needs Playwright Chromium (`npx playwright install chromium` from the repo root if launch fails on the daemon). Env pinned by launch:
 
-- `CALORIE_LOGGER_DB_PATH` — disposable file; first request seeds ~110 built-in foods and default goals (2000 / 120 / 225 / 65)
+- `MACRO_DATA_DIR` — disposable per-user dir; first authenticated request seeds ~110 built-in foods and default goals (2000 / 120 / 225 / 65)
+- `AUTH_SECRET` / `AUTH_TEST_MINT=1` — minted session for Verify (`verify@local.test`)
 - `AI_PROVIDER=none` — built-in parser only; unknown foods do not resolve
 - `AI_CLAUDE_BIN` / `AI_CODEX_BIN` — fake paths so Connect stays disabled
 - `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` cleared

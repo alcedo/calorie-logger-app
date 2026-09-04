@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withUser } from "@/lib/auth";
 import { clearAiStatusCache, getAiStatus } from "@/lib/ai";
 import {
   cancelLogin,
@@ -29,7 +30,7 @@ function isKind(v: unknown): v is LoginKind {
   return v === "claude" || v === "codex";
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withUser(async (req: NextRequest) => {
   const body = await req.json().catch(() => null);
   const action = body?.action as string | undefined;
 
@@ -135,4 +136,4 @@ export async function POST(req: NextRequest) {
     const message = publicCliErrorMessage(err);
     return NextResponse.json({ error: message }, { status: 400 });
   }
-}
+});

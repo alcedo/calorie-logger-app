@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import type { EntryDto } from "@/lib/types";
 import {
   consumeSse,
@@ -18,7 +19,7 @@ export async function logMealFromClient(
   date: string,
   onEvent: LogTraceListener,
 ): Promise<LogMealClientResult> {
-  const res = await fetch("/api/log?stream=1", {
+  const res = await apiFetch("/api/log?stream=1", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

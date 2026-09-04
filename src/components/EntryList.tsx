@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api";
 import type { EntryDto } from "@/lib/types";
 
 function formatTime(iso: string): string {
@@ -21,14 +22,14 @@ export function EntryList({
   const [editQty, setEditQty] = useState("");
 
   async function remove(id: number) {
-    await fetch(`/api/entries/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/entries/${id}`, { method: "DELETE" });
     onChanged();
   }
 
   async function saveQty(id: number) {
     const quantity = parseFloat(editQty);
     if (Number.isFinite(quantity) && quantity > 0) {
-      await fetch(`/api/entries/${id}`, {
+      await apiFetch(`/api/entries/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quantity }),

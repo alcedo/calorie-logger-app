@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { foods } from "@/db/schema";
 import { like, asc } from "drizzle-orm";
+import { withUser } from "@/lib/auth";
 import { cacheFood } from "@/lib/food-lookup";
 import { normalizeFoodName } from "@/lib/normalize";
 
-export async function GET(req: NextRequest) {
+export const GET = withUser(async (req: NextRequest) => {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const rows = q
     ? db
@@ -16,9 +17,9 @@ export async function GET(req: NextRequest) {
         .all()
     : db.select().from(foods).orderBy(asc(foods.name)).all();
   return NextResponse.json({ foods: rows });
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withUser(async (req: NextRequest) => {
   const body = await req.json().catch(() => null);
   if (!body?.name || !Number.isFinite(Number(body?.calories))) {
     return NextResponse.json(
@@ -41,4 +42,4 @@ export async function POST(req: NextRequest) {
     source: "user",
   });
   return NextResponse.json({ food }, { status: 201 });
-}
+});

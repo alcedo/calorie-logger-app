@@ -57,13 +57,13 @@ describe("claudeChildEnv", () => {
     assert.ok(hasStrayAnthropicKey());
   });
 
-  it("passes through CLAUDE_CODE_OAUTH_TOKEN after dropping API keys", () => {
+  it("does not forward the host CLAUDE_CODE_OAUTH_TOKEN", () => {
     stash();
     process.env.ANTHROPIC_API_KEY = "sk-ant-api-test";
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = "sk-ant-oat-keep";
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "sk-ant-oat-host";
     const env = claudeChildEnv();
     assert.equal(env.ANTHROPIC_API_KEY, undefined);
-    assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, "sk-ant-oat-keep");
+    assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, undefined);
   });
 
   it("drops scratch CODEX_HOME / CLAUDE_CONFIG_DIR under /tmp", () => {

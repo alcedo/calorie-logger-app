@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withUser } from "@/lib/auth";
 import { logMeal } from "@/lib/log-meal";
 import { encodeSse, wantsStream } from "@/lib/log-trace";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST(req: NextRequest) {
+export const POST = withUser(async (req: NextRequest) => {
   const body = await req.json().catch(() => null);
   const text: string | undefined = body?.text?.trim();
   const date: string =
@@ -71,4 +72,4 @@ export async function POST(req: NextRequest) {
     usedAiParser: result.usedAiParser,
     trace: result.trace,
   });
-}
+});
