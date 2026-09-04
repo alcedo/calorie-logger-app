@@ -12,7 +12,7 @@ The app parses the sentence, figures out calories, protein, carbs, fat (plus fib
 2. **AI fallback** — if a food isn't in the database, the app searches USDA FoodData Central, Open Food Facts, and the web, then the connected LLM reads those results and returns per-serving nutrition. You can watch the thought process (parse reasoning, search queries, and sources) while a meal is logged.
 3. **Caching** — AI results are saved back into SQLite, so each food is only ever looked up once.
 
-Pick a **provider and model** on the Today page or the AI page. Claude Code login is the default; ChatGPT/Codex is next; an OpenAI API key is a paid opt-in and is never selected automatically.
+Pick a **provider and model** on the Today page or the AI page. Claude Code login is the default on a machine that can run the CLI; ChatGPT/Codex is next. An OpenAI API key is a paid opt-in. Local auto never selects it. On Vercel, auto uses that key because the CLIs cannot run there.
 
 ## Features
 
@@ -40,13 +40,15 @@ Open http://localhost:3000. The SQLite database is created and seeded automatica
 
 Open https://calorie-logger-app.vercel.app and log a built-in food, for example `2 eggs and 200g chicken breast`.
 
-Vercel Functions cannot write under the app directory, so the host stores SQLite in the instance tmp directory (`calorie-logger.db`). A cold start starts from an empty seeded database. Claude Code and Codex logins do not run on Vercel. Those CLIs are not installed there.
+Vercel Functions cannot write under the app directory, so the host stores SQLite in the instance tmp directory (`calorie-logger.db`). That file is ephemeral. A cold start starts from an empty seeded database.
 
-Without a signed-in CLI, the app still works for foods already in the database (a simple built-in parser handles inputs like "2 eggs and 200g chicken breast"), but unknown foods can't be looked up.
+Vercel Functions cannot spawn `claude` or `codex`. The AI page does not offer Connect or setup-token there, and it does not report a missing CLI on PATH. Set `OPENAI_API_KEY` on the Vercel project. Auto then uses that key for unknown-food lookup. Without the key, only the ~110 built-in foods resolve.
 
-Open **AI** in the app to connect a Claude or ChatGPT subscription from your phone: Claude shows a login link plus a code to paste; ChatGPT uses Codex device-auth (open the page, type the one-time code). No API keys.
+A Claude or ChatGPT subscription login needs a long-lived machine with the CLI. That is a local or Cloud Agent `next dev` setup, not Vercel Functions.
 
-The Claude Code and Codex CLIs must be installed **on the computer that runs this app** (the Next.js server), not on your phone. `scripts/install-ai-clis.sh` does that (Cloud Agent setup runs the same official installers). If a CLI is missing, Connect is disabled and the page explains how to install it. `POST /api/ai` `{ action: "connect" }` also refuses to spawn a missing binary.
+Open **AI** on a machine that runs the Next.js server to connect a Claude or ChatGPT subscription: Claude shows a login link plus a code to paste; ChatGPT uses Codex device-auth (open the page, type the one-time code).
+
+The Claude Code and Codex CLIs must be installed **on the computer that runs this app** (the Next.js server), not on your phone. `scripts/install-ai-clis.sh` does that (Cloud Agent setup runs the same official installers). If a CLI is missing on that machine, Connect is disabled and the page explains how to install it. `POST /api/ai` `{ action: "connect" }` also refuses to spawn a missing binary.
 
 ### Claude subscription (default)
 
@@ -64,7 +66,7 @@ Install the Codex CLI and run `codex login`. Auto-detection uses Codex when Clau
 
 ### OpenAI API key (opt-in, paid)
 
-Set `AI_PROVIDER=openai` **and** `OPENAI_API_KEY`. This provider is never chosen by auto-detection.
+Set `AI_PROVIDER=openai` **and** `OPENAI_API_KEY`. Local auto never chooses this provider. On Vercel (`VERCEL=1`), auto uses the key because Claude and Codex cannot run.
 
 ### Environment
 
@@ -79,7 +81,7 @@ See [`.env.example`](.env.example). Useful variables:
 | `USDA_API_KEY` | Optional [FoodData Central](https://fdc.nal.usda.gov/api-guide.html) key; falls back to `DEMO_KEY` |
 | `AI_CLI_TIMEOUT_MS` | Subprocess timeout, minimum 20000, default 60000 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Headless fallback; prefer `claude auth login` |
-| `OPENAI_API_KEY` | Paid opt-in; requires `AI_PROVIDER=openai` |
+| `OPENAI_API_KEY` | Paid opt-in. Required for AI lookup on Vercel. Local auto never selects it. |
 
 Verify a signed-in setup with `npm run ai:doctor`. Unauthenticated CLI wiring can be checked with `npm run ai:cli-smoke`.
 
