@@ -152,8 +152,10 @@ describe("AI connections page", () => {
     expect(screen.queryByText("CLI not installed")).toBeNull();
     expect(screen.queryByText(/Install the CLI on that computer/i)).toBeNull();
     expect(screen.queryByText(/not found on PATH/i)).toBeNull();
-    expect(screen.getByText(/I already have a claude setup-token/i)).toBeVisible();
-    expect(screen.getByText(/claude setup-token/i)).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /I already have a claude setup-token/i }),
+    ).toBeVisible();
+    expect(screen.getByText("claude setup-token")).toBeVisible();
   });
 
   it("lets you disconnect a pasted Claude token on a serverless host", async () => {
