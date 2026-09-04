@@ -13,3 +13,4 @@ ts	phase	decision	why	evidence	result
 2026-09-04T01:04:57Z	arena	picked candidate 3 as base, ALS packages as grafts only	overlapping requests need a visible owner; C2 is the same idea with extra catalog machinery	.audit/design.md	pick recorded, judge still running
 2026-09-04T01:23:09Z	pick	base is candidate 1 with Auth.js JWT grafts	cross-judge rejected C3 dual UserId and per-handler requireScope	/tmp/arena-multi-user/JUDGE.md .audit/design.md	VERIFIED judge file + isolation tests later green
 2026-09-04T01:23:09Z	impl	withUser plus per-user sqlite and AI slots	fail-closed db and separate files were the exit predicate	src/lib/auth src/lib/tenant.ts src/db/open.ts	VERIFIED isolation + npm test 183 passed
+2026-09-04T01:28:54Z	verify	signed-in UI log and 401 without cookie	predicate items 1 6 8 checked on isolated :4174 plus npm test 183	control-macro doctor 200 banner none; curl /api/status 401; Today Egg Chicken 474; Sign out to Google page	VERIFIED
