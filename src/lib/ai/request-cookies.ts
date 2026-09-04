@@ -26,16 +26,21 @@ const DEVICE_COOKIE_OPTS = {
   maxAge: 15 * 60,
 };
 
-export async function overlayFromNextCookies(): Promise<CredentialOverlay> {
+async function cookieJar() {
   try {
-    const jar = await cookies();
-    return {
-      claudeToken: jar.get(CLAUDE_OAUTH_COOKIE)?.value,
-      codexAuth: parseCodexAuthJson(jar.get(CODEX_AUTH_COOKIE)?.value) ?? undefined,
-    };
+    return await cookies();
   } catch {
-    return {};
+    return null;
   }
+}
+
+export async function overlayFromNextCookies(): Promise<CredentialOverlay> {
+  const jar = await cookieJar();
+  if (!jar) return {};
+  return {
+    claudeToken: jar.get(CLAUDE_OAUTH_COOKIE)?.value,
+    codexAuth: parseCodexAuthJson(jar.get(CODEX_AUTH_COOKIE)?.value) ?? undefined,
+  };
 }
 
 export async function withRequestCookies<T>(fn: () => Promise<T>): Promise<T> {
@@ -44,32 +49,26 @@ export async function withRequestCookies<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export async function syncCredentialCookies(): Promise<void> {
-  try {
-    const jar = await cookies();
-    const claude = readClaudeCredential();
-    const codex = readCodexCredential();
-    if (claude) jar.set(CLAUDE_OAUTH_COOKIE, claude.token, COOKIE_OPTS);
-    else jar.delete(CLAUDE_OAUTH_COOKIE);
-    if (codex) jar.set(CODEX_AUTH_COOKIE, serializeCodexAuth(codex), COOKIE_OPTS);
-    else jar.delete(CODEX_AUTH_COOKIE);
-  } catch {
-    /* tests and non-request callers have no cookie jar */
-  }
+  const jar = await cookieJar();
+  if (!jar) return;
+  const claude = readClaudeCredential();
+  const codex = readCodexCredential();
+  if (claude) jar.set(CLAUDE_OAUTH_COOKIE, claude.token, COOKIE_OPTS);
+  else jar.delete(CLAUDE_OAUTH_COOKIE);
+  if (codex) jar.set(CODEX_AUTH_COOKIE, serializeCodexAuth(codex), COOKIE_OPTS);
+  else jar.delete(CODEX_AUTH_COOKIE);
 }
 
 export async function writeCodexDeviceCookie(
   state: CodexDeviceState | null,
 ): Promise<void> {
-  try {
-    const jar = await cookies();
-    if (!state) {
-      jar.delete(CODEX_DEVICE_COOKIE);
-      return;
-    }
-    jar.set(CODEX_DEVICE_COOKIE, JSON.stringify(state), DEVICE_COOKIE_OPTS);
-  } catch {
-    /* tests and non-request callers have no cookie jar */
+  const jar = await cookieJar();
+  if (!jar) return;
+  if (!state) {
+    jar.delete(CODEX_DEVICE_COOKIE);
+    return;
   }
+  jar.set(CODEX_DEVICE_COOKIE, JSON.stringify(state), DEVICE_COOKIE_OPTS);
 }
 
 export async function readCodexDeviceCookie(): Promise<CodexDeviceState | null> {

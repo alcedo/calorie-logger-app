@@ -65,8 +65,13 @@ export default function AiPage() {
         if (data.login?.phase === "failed") {
           setError(data.login.error || "ChatGPT login failed");
         }
-      } catch {
-        /* session expired */
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (/No such login session/i.test(message)) {
+          setLogin(null);
+          return;
+        }
+        setError(message);
       }
     }, 2000);
     return () => clearInterval(t);

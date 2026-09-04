@@ -7,7 +7,6 @@ import type {
 } from "./types";
 import { SERVERLESS_NONE_BANNER } from "../runtime";
 
-/** Auto never includes openai — that provider spends an API key. */
 export const AUTO_ORDER: ProviderId[] = ["claude", "codex"];
 
 export const NONE_BANNER =
@@ -42,10 +41,6 @@ export type ResolvedAiStatusView = Pick<
   "aiAvailable" | "provider" | "providerLabel" | "bannerKind" | "bannerMessage"
 >;
 
-/**
- * Pure provider pick. Local auto never bills OpenAI. Serverless auto may,
- * because CLIs cannot run there.
- */
 export function resolveAiStatusView(
   input: ResolveAiStatusInput,
 ): ResolvedAiStatusView {

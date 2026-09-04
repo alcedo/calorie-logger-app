@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, readFileSync, unlinkSync } from "node:fs";
+import { chmodSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeAll, describe, it } from "vitest";
@@ -95,11 +95,7 @@ describe("login sessions against fake CLIs", () => {
       assert.equal(done.phase, "done");
     } finally {
       cancelLogin(login.sessionId);
-      try {
-        unlinkSync(dump);
-      } catch {
-        /* ignore */
-      }
+      rmSync(dump, { force: true });
     }
   });
 

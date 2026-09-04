@@ -67,19 +67,22 @@ function store(): Store {
   return g.__macroAiLogins;
 }
 
+function signalChild(child: ChildProcess, signal: NodeJS.Signals) {
+  try {
+    child.kill(signal);
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err ? err.code : undefined;
+    if (code === "ESRCH") return;
+    throw err;
+  }
+}
+
 function killChild(child: ChildProcess | null) {
   if (!child) return;
-  try {
-    child.kill("SIGTERM");
-  } catch {
-    /* already gone */
-  }
+  signalChild(child, "SIGTERM");
   setTimeout(() => {
-    try {
-      child.kill("SIGKILL");
-    } catch {
-      /* ignore */
-    }
+    signalChild(child, "SIGKILL");
   }, 1500).unref();
 }
 

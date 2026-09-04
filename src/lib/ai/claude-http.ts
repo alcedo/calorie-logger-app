@@ -63,12 +63,16 @@ export async function generateJsonViaClaudeHttp<T>(
     return tool.input as T;
   }
   const text = payload?.content?.find((part) => part.type === "text")?.text;
-  if (text) {
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      /* fall through */
-    }
-  }
+  const parsed = text ? parseJsonObject<T>(text) : undefined;
+  if (parsed) return parsed;
   throw new Error("Claude HTTP returned no structured output");
+}
+
+function parseJsonObject<T>(text: string): T | undefined {
+  try {
+    const value = JSON.parse(text) as unknown;
+    return value && typeof value === "object" ? (value as T) : undefined;
+  } catch {
+    return undefined;
+  }
 }
