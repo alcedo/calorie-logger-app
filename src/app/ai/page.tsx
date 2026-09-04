@@ -151,10 +151,11 @@ export default function AiPage() {
 
   const claude = providerState(status, "claude");
   const codex = providerState(status, "codex");
+  const serverless = Boolean(status?.serverlessHost);
   const claudeOn = Boolean(claude?.available);
   const codexOn = Boolean(codex?.available);
-  const claudeCliMissing = claude?.cliInstalled === false;
-  const codexCliMissing = codex?.cliInstalled === false;
+  const claudeCliMissing = !serverless && claude?.cliInstalled === false;
+  const codexCliMissing = !serverless && codex?.cliInstalled === false;
   const claudeConnectBlocked = !status || claudeCliMissing;
   const codexConnectBlocked = !status || codexCliMissing;
   const anyCliMissing = claudeCliMissing || codexCliMissing;
@@ -164,17 +165,22 @@ export default function AiPage() {
       <header>
         <h1 className="text-lg font-semibold text-zinc-100">AI connections</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Link the Claude or ChatGPT subscription you already pay for. No API
-          keys. Unknown foods then look up automatically — the model searches
-          USDA, Open Food Facts, and the web, and you can watch its thought
-          process while logging.
+          {serverless
+            ? "Unknown foods look up through the OpenAI API on this host. Claude and ChatGPT CLI logins cannot run on Vercel."
+            : "Link the Claude or ChatGPT subscription you already pay for. No API keys. Unknown foods then look up automatically — the model searches USDA, Open Food Facts, and the web, and you can watch its thought process while logging."}
         </p>
-        {anyCliMissing && (
+        {serverless ? (
+          <p className="mt-2 text-sm text-amber-300/90">
+            This server is on Vercel. Claude Code and Codex CLIs cannot run
+            here. Set <code>OPENAI_API_KEY</code> to look up unknown foods.
+            Auto uses that key on this host.
+          </p>
+        ) : anyCliMissing ? (
           <p className="mt-2 text-sm text-amber-300/90">
             Connect runs on this app&apos;s server, not on your phone. Install
             the CLI on that computer, then refresh this page.
           </p>
-        )}
+        ) : null}
       </header>
 
       {status?.bannerKind === "ok" && status.providerLabel && (
@@ -207,14 +213,16 @@ export default function AiPage() {
                 ? claude?.subscriptionType
                   ? claude.subscriptionType
                   : "Connected"
-                : claudeCliMissing
-                  ? "CLI not installed"
-                  : "Not connected"
+                : serverless
+                  ? "Unavailable on Vercel"
+                  : claudeCliMissing
+                    ? "CLI not installed"
+                    : "Not connected"
             }
           />
         </div>
 
-        {login?.provider === "claude" ? (
+        {!serverless && login?.provider === "claude" ? (
           <div className="mt-4 space-y-3">
             <p className="text-sm text-zinc-300">
               1. Open the Claude login page and sign in with your subscription.
@@ -253,7 +261,7 @@ export default function AiPage() {
               </button>
             </div>
           </div>
-        ) : (
+        ) : !serverless ? (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -273,16 +281,18 @@ export default function AiPage() {
               </button>
             )}
           </div>
-        )}
+        ) : null}
 
-        <button
-          type="button"
-          onClick={() => setShowToken((v) => !v)}
-          className="mt-3 text-xs text-zinc-500 underline"
-        >
-          {showToken ? "Hide setup-token" : "I already have a claude setup-token"}
-        </button>
-        {showToken && (
+        {!serverless && (
+          <button
+            type="button"
+            onClick={() => setShowToken((v) => !v)}
+            className="mt-3 text-xs text-zinc-500 underline"
+          >
+            {showToken ? "Hide setup-token" : "I already have a claude setup-token"}
+          </button>
+        )}
+        {!serverless && showToken && (
           <div className="mt-2 space-y-2">
             <p className="text-xs text-zinc-500">
               On a computer with Claude Code, run <code>claude setup-token</code> and
@@ -322,14 +332,16 @@ export default function AiPage() {
             label={
               codexOn
                 ? "Connected"
-                : codexCliMissing
-                  ? "CLI not installed"
-                  : "Not connected"
+                : serverless
+                  ? "Unavailable on Vercel"
+                  : codexCliMissing
+                    ? "CLI not installed"
+                    : "Not connected"
             }
           />
         </div>
 
-        {login?.provider === "codex" ? (
+        {!serverless && login?.provider === "codex" ? (
           <div className="mt-4 space-y-3">
             <p className="text-sm text-zinc-300">
               1. Open ChatGPT device login and sign in.
@@ -357,7 +369,7 @@ export default function AiPage() {
               Cancel
             </button>
           </div>
-        ) : (
+        ) : !serverless ? (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -377,15 +389,15 @@ export default function AiPage() {
               </button>
             )}
           </div>
-        )}
+        ) : null}
       </section>
 
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
         <h2 className="text-sm font-semibold text-zinc-200">Provider and model</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Choose which connected subscription (or paid OpenAI key) to use, and
-          which model it should call. Auto picks Claude if it is signed in,
-          otherwise ChatGPT.
+          {serverless
+            ? "On Vercel, Auto uses the OpenAI API key. Claude and ChatGPT logins are unavailable."
+            : "Choose which connected subscription (or paid OpenAI key) to use, and which model it should call. Auto picks Claude if it is signed in, otherwise ChatGPT."}
         </p>
         <div className="mt-4">
           <AiPicker status={status} onChange={setPreference} showAllModels />

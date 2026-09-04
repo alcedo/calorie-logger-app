@@ -13,6 +13,7 @@ import {
   cliNotFoundMessage,
   requireCliInstalled,
 } from "./run-cli";
+import { isServerlessHost, SERVERLESS_CONNECT_ERROR } from "../runtime";
 
 export type LoginKind = "claude" | "codex";
 
@@ -193,6 +194,7 @@ async function spawnUntilParsed(
 }
 
 export async function startClaudeLogin(): Promise<LoginSessionPublic> {
+  if (isServerlessHost()) throw new Error(SERVERLESS_CONNECT_ERROR);
   cancelProvider("claude");
   const { child, sessionBuf, closed } = await spawnUntilParsed(
     claudeBin(),
@@ -284,6 +286,7 @@ export async function completeClaudeLogin(
 }
 
 export async function startCodexLogin(): Promise<LoginSessionPublic> {
+  if (isServerlessHost()) throw new Error(SERVERLESS_CONNECT_ERROR);
   cancelProvider("codex");
   const { child, sessionBuf, closed } = await spawnUntilParsed(
     codexBin(),

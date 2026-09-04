@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
+import { SERVERLESS_NONE_BANNER } from "../runtime";
 import {
   AUTO_ORDER,
   API_KEY_BANNER,
@@ -80,6 +81,58 @@ describe("resolveAiStatusView", () => {
     assert.equal(view.bannerMessage, NONE_BANNER);
   });
 
+  it("auto on a serverless host picks openai when the key is set", () => {
+    const view = resolveAiStatusView({
+      selection: "auto",
+      serverlessHost: true,
+      probed: probed({
+        claude: {
+          available: false,
+          detail: "CLIs cannot run",
+          reason: "serverless",
+          cliInstalled: false,
+        },
+        openai: { available: true, detail: "OPENAI_API_KEY is set" },
+      }),
+    });
+    assert.equal(view.provider, "openai");
+    assert.equal(view.aiAvailable, true);
+    assert.equal(view.bannerKind, "ok");
+    assert.equal(view.bannerMessage, null);
+  });
+
+  it("auto on a serverless host without a key uses SERVERLESS_NONE_BANNER", () => {
+    const view = resolveAiStatusView({
+      selection: "auto",
+      serverlessHost: true,
+      probed: probed({
+        claude: {
+          available: false,
+          detail: "CLIs cannot run",
+          reason: "serverless",
+          cliInstalled: false,
+        },
+      }),
+    });
+    assert.equal(view.provider, null);
+    assert.equal(view.aiAvailable, false);
+    assert.equal(view.bannerKind, "none");
+    assert.equal(view.bannerMessage, SERVERLESS_NONE_BANNER);
+  });
+
+  it("auto on a serverless host prefers OpenAI over a stray Anthropic key", () => {
+    const view = resolveAiStatusView({
+      selection: "auto",
+      serverlessHost: true,
+      strayAnthropicKey: true,
+      probed: probed({
+        openai: { available: true, detail: "OPENAI_API_KEY is set" },
+      }),
+    });
+    assert.equal(view.provider, "openai");
+    assert.equal(view.bannerKind, "ok");
+  });
+
   it("auto surfaces the API-key banner when Claude would bill a key", () => {
     const view = resolveAiStatusView({
       selection: "auto",
@@ -118,6 +171,18 @@ describe("resolveAiStatusView", () => {
     assert.equal(view.provider, null);
     assert.equal(view.aiAvailable, false);
     assert.match(view.bannerMessage ?? "", /Not logged in/);
+  });
+
+  it("serverless auto still prefers Claude when it is available", () => {
+    const view = resolveAiStatusView({
+      selection: "auto",
+      serverlessHost: true,
+      probed: probed({
+        claude: { available: true, detail: "Logged in" },
+        openai: { available: true, detail: "key set" },
+      }),
+    });
+    assert.equal(view.provider, "claude");
   });
 
   it("openai is only used when explicitly selected and the key is set", () => {

@@ -12,6 +12,7 @@ import {
 import { isAllowedModelId, normalizeModelId } from "@/lib/ai/models";
 import { validateClaudeSetupToken } from "@/lib/ai/setup-token";
 import { publicCliErrorMessage } from "@/lib/ai/run-cli";
+import { isServerlessHost, SERVERLESS_CONNECT_ERROR } from "@/lib/runtime";
 import {
   deleteSetting,
   setSetting,
@@ -24,6 +25,7 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function isKind(v: unknown): v is LoginKind {
   return v === "claude" || v === "codex";
@@ -36,6 +38,12 @@ export async function POST(req: NextRequest) {
   try {
     switch (action) {
       case "connect": {
+        if (isServerlessHost()) {
+          return NextResponse.json(
+            { error: SERVERLESS_CONNECT_ERROR },
+            { status: 400 },
+          );
+        }
         if (!isKind(body?.provider)) {
           return NextResponse.json({ error: "provider must be claude or codex" }, { status: 400 });
         }
@@ -77,6 +85,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ status: await getAiStatus() });
       }
       case "token": {
+        if (isServerlessHost()) {
+          return NextResponse.json(
+            { error: SERVERLESS_CONNECT_ERROR },
+            { status: 400 },
+          );
+        }
         const parsed = validateClaudeSetupToken(String(body?.token ?? ""));
         if (!parsed.ok) {
           return NextResponse.json({ error: parsed.error }, { status: 400 });

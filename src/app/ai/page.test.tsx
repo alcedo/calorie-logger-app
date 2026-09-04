@@ -39,6 +39,7 @@ function status(overrides: Partial<AiStatusDto> = {}): AiStatusDto {
     },
     activeModel: null,
     activeModelLabel: null,
+    serverlessHost: false,
     ...overrides,
   };
 }
@@ -114,5 +115,49 @@ describe("AI connections page", () => {
     });
     expect(screen.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled();
     expect(screen.queryByText("CLI not installed")).toBeNull();
+  });
+
+  it("hides Connect and PATH copy on a serverless host", async () => {
+    mockStatus(
+      status({
+        serverlessHost: true,
+        bannerKind: "none",
+        bannerMessage:
+          "AI lookup on Vercel requires the OpenAI API. Set OPENAI_API_KEY.",
+        providers: [
+          {
+            id: "claude",
+            available: false,
+            detail:
+              "Claude Code and Codex CLIs cannot run on Vercel. Set OPENAI_API_KEY to look up unknown foods, or run the app on a machine with the CLI.",
+            reason: "serverless",
+            cliInstalled: false,
+          },
+          {
+            id: "codex",
+            available: false,
+            detail:
+              "Claude Code and Codex CLIs cannot run on Vercel. Set OPENAI_API_KEY to look up unknown foods, or run the app on a machine with the CLI.",
+            reason: "serverless",
+            cliInstalled: false,
+          },
+          { id: "openai", available: false, detail: "no key", reason: "missing" },
+        ],
+      }),
+    );
+    render(<AiPage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Unavailable on Vercel")).toHaveLength(2);
+    });
+    expect(screen.queryByRole("button", { name: "Connect Claude" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).toBeNull();
+    expect(screen.queryByText("CLI not installed")).toBeNull();
+    expect(screen.queryByText(/Install the CLI on that computer/i)).toBeNull();
+    expect(screen.queryByText(/I already have a claude setup-token/i)).toBeNull();
+    expect(screen.queryByText(/not found on PATH/i)).toBeNull();
+    expect(screen.getByText(/This server is on Vercel/i)).toBeVisible();
+    expect(screen.getAllByText(/OPENAI_API_KEY/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Auto uses that key/i)).toBeVisible();
   });
 });

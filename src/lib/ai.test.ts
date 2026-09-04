@@ -26,6 +26,7 @@ describe("ai module", () => {
   const ORIGINAL_KEY = process.env.OPENAI_API_KEY;
   const ORIGINAL_MODEL = process.env.OPENAI_MODEL;
   const ORIGINAL_PROVIDER = process.env.AI_PROVIDER;
+  const ORIGINAL_VERCEL = process.env.VERCEL;
 
   beforeEach(async () => {
     createMock.mockReset();
@@ -40,6 +41,7 @@ describe("ai module", () => {
     ]);
     delete process.env.OPENAI_API_KEY;
     delete process.env.AI_PROVIDER;
+    delete process.env.VERCEL;
     vi.resetModules();
     const { clearAiStatusCache } = await import("./ai");
     clearAiStatusCache();
@@ -52,6 +54,8 @@ describe("ai module", () => {
     else process.env.OPENAI_MODEL = ORIGINAL_MODEL;
     if (ORIGINAL_PROVIDER === undefined) delete process.env.AI_PROVIDER;
     else process.env.AI_PROVIDER = ORIGINAL_PROVIDER;
+    if (ORIGINAL_VERCEL === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = ORIGINAL_VERCEL;
   });
 
   it("does not treat OPENAI_API_KEY as available under auto", async () => {
@@ -60,6 +64,38 @@ describe("ai module", () => {
     const status = await getAiStatus();
     expect(status.aiAvailable).toBe(false);
     expect(status.provider).toBeNull();
+  });
+
+  it("auto selects OpenAI on Vercel when a key is set", async () => {
+    process.env.VERCEL = "1";
+    process.env.OPENAI_API_KEY = "test-key";
+    const { getAiStatus } = await import("./ai");
+    const status = await getAiStatus();
+    expect(status.aiAvailable).toBe(true);
+    expect(status.provider).toBe("openai");
+    expect(status.serverlessHost).toBe(true);
+    expect(status.providers.find((p) => p.id === "claude")?.reason).toBe(
+      "serverless",
+    );
+    expect(status.providers.find((p) => p.id === "claude")?.detail).not.toMatch(
+      /PATH/,
+    );
+    expect(status.providers.find((p) => p.id === "codex")?.detail).not.toMatch(
+      /PATH/,
+    );
+  });
+
+  it("auto stays unavailable on Vercel without a key", async () => {
+    process.env.VERCEL = "1";
+    const { getAiStatus } = await import("./ai");
+    const status = await getAiStatus();
+    expect(status.aiAvailable).toBe(false);
+    expect(status.serverlessHost).toBe(true);
+    expect(status.bannerMessage).toMatch(/OPENAI_API_KEY/);
+    expect(status.bannerMessage).not.toMatch(/Connect Claude/);
+    expect(status.providers.find((p) => p.id === "claude")?.detail).not.toMatch(
+      /PATH/,
+    );
   });
 
   it("enables OpenAI only when AI_PROVIDER=openai and a key is set", async () => {

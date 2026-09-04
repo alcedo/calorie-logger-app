@@ -11,6 +11,7 @@ import {
   startClaudeLogin,
   startCodexLogin,
 } from "./login";
+import { SERVERLESS_CONNECT_ERROR } from "../runtime";
 
 const fixtures = fileURLToPath(new URL("./fixtures", import.meta.url));
 const fakeClaude = join(fixtures, "fake-claude-login.mjs");
@@ -27,10 +28,12 @@ const ENV_KEYS = [
   "DISPLAY",
   "TERM",
   "TMUX",
+  "VERCEL",
 ] as const;
 
 function stashEnv() {
   for (const key of ENV_KEYS) saved[key] = process.env[key];
+  delete process.env.VERCEL;
 }
 
 function restoreEnv() {
@@ -135,6 +138,31 @@ describe("login sessions against fake CLIs", () => {
       Date.now() - started < 2000,
       "missing CLI must fail in preflight, not after spawn timeout",
     );
+  });
+
+  it("refuses Claude login on Vercel without spawning", async () => {
+    stashEnv();
+    process.env.VERCEL = "1";
+    process.env.AI_CLAUDE_BIN = fakeClaude;
+    process.env.AI_LOGIN_START_WAIT_MS = "2000";
+    await assert.rejects(
+      () => startClaudeLogin(),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.equal(err.message, SERVERLESS_CONNECT_ERROR);
+        return true;
+      },
+    );
+    assert.equal(activeLogins().length, 0);
+  });
+
+  it("refuses Codex login on Vercel without spawning", async () => {
+    stashEnv();
+    process.env.VERCEL = "1";
+    process.env.AI_CODEX_BIN = fakeCodex;
+    process.env.AI_LOGIN_START_WAIT_MS = "2000";
+    await assert.rejects(() => startCodexLogin(), /cannot run on Vercel/);
+    assert.equal(activeLogins().length, 0);
   });
 
   it("maps a missing Claude binary to a readable error (not spawn ENOENT)", async () => {

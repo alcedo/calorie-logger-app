@@ -201,8 +201,10 @@ describe("history and status APIs", () => {
   it("status reflects AI availability", async () => {
     const originalKey = process.env.OPENAI_API_KEY;
     const originalProvider = process.env.AI_PROVIDER;
+    const originalVercel = process.env.VERCEL;
     delete process.env.OPENAI_API_KEY;
     delete process.env.AI_PROVIDER;
+    delete process.env.VERCEL;
     const { clearAiStatusCache } = await import("@/lib/ai");
     clearAiStatusCache();
 
@@ -233,6 +235,8 @@ describe("history and status APIs", () => {
     else process.env.OPENAI_API_KEY = originalKey;
     if (originalProvider === undefined) delete process.env.AI_PROVIDER;
     else process.env.AI_PROVIDER = originalProvider;
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
     clearAiStatusCache();
   });
 
@@ -257,6 +261,62 @@ describe("history and status APIs", () => {
     if (originalProvider === undefined) delete process.env.AI_PROVIDER;
     else process.env.AI_PROVIDER = originalProvider;
     clearAiStatusCache();
+  });
+
+  it("on Vercel, auto uses OpenAI and connect is refused", async () => {
+    const originalVercel = process.env.VERCEL;
+    const originalKey = process.env.OPENAI_API_KEY;
+    const originalProvider = process.env.AI_PROVIDER;
+    process.env.VERCEL = "1";
+    process.env.OPENAI_API_KEY = "x";
+    delete process.env.AI_PROVIDER;
+    const { clearAiStatusCache } = await import("@/lib/ai");
+    const { SERVERLESS_CONNECT_ERROR } = await import("@/lib/runtime");
+    try {
+      clearAiStatusCache();
+
+      const { GET } = await import("@/app/api/status/route");
+      const { POST } = await import("@/app/api/ai/route");
+      const status = await readJson<{
+        aiAvailable: boolean;
+        provider: string | null;
+        serverlessHost: boolean;
+        providers: Array<{ id: string; reason?: string; detail: string }>;
+      }>(await GET());
+      expect(status.body.serverlessHost).toBe(true);
+      expect(status.body.aiAvailable).toBe(true);
+      expect(status.body.provider).toBe("openai");
+      expect(status.body.providers.find((p) => p.id === "claude")?.reason).toBe(
+        "serverless",
+      );
+      expect(
+        status.body.providers.find((p) => p.id === "claude")?.detail,
+      ).not.toMatch(/PATH/);
+
+      const connect = await POST(
+        jsonRequest("POST", "/api/ai", { action: "connect", provider: "claude" }),
+      );
+      const { status: connectStatus, body } = await readJson<{ error: string }>(
+        connect,
+      );
+      expect(connectStatus).toBe(400);
+      expect(body.error).toBe(SERVERLESS_CONNECT_ERROR);
+
+      const token = await POST(
+        jsonRequest("POST", "/api/ai", { action: "token", token: "x".repeat(20) }),
+      );
+      const tokenRes = await readJson<{ error: string }>(token);
+      expect(tokenRes.status).toBe(400);
+      expect(tokenRes.body.error).toBe(SERVERLESS_CONNECT_ERROR);
+    } finally {
+      if (originalVercel === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = originalVercel;
+      if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = originalKey;
+      if (originalProvider === undefined) delete process.env.AI_PROVIDER;
+      else process.env.AI_PROVIDER = originalProvider;
+      clearAiStatusCache();
+    }
   });
 
   it("connect Codex without a CLI returns a readable error, not spawn ENOENT", async () => {
