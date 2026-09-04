@@ -5,8 +5,8 @@ import type {
   ProviderAvailability,
   ProviderId,
 } from "./types";
+import { SERVERLESS_NONE_BANNER } from "../runtime";
 
-/** Auto never includes openai — that provider spends an API key. */
 export const AUTO_ORDER: ProviderId[] = ["claude", "codex"];
 
 export const NONE_BANNER =
@@ -33,6 +33,7 @@ export interface ResolveAiStatusInput {
   probed: Record<ProviderId, ProviderAvailability>;
   strayAnthropicKey?: boolean;
   invalidProviderRaw?: string;
+  serverlessHost?: boolean;
 }
 
 export type ResolvedAiStatusView = Pick<
@@ -40,10 +41,6 @@ export type ResolvedAiStatusView = Pick<
   "aiAvailable" | "provider" | "providerLabel" | "bannerKind" | "bannerMessage"
 >;
 
-/**
- * Pure provider pick. Used by GET /api/status and unit tests so auto-select
- * cannot silently start billing OpenAI.
- */
 export function resolveAiStatusView(
   input: ResolveAiStatusInput,
 ): ResolvedAiStatusView {
@@ -68,6 +65,13 @@ export function resolveAiStatusView(
     if (activeId) {
       bannerKind = "ok";
       bannerMessage = null;
+    } else if (input.serverlessHost && probed.openai.available) {
+      activeId = "openai";
+      bannerKind = "ok";
+      bannerMessage = null;
+    } else if (input.serverlessHost) {
+      bannerKind = "none";
+      bannerMessage = SERVERLESS_NONE_BANNER;
     } else if (probed.claude.reason === "api_key" || input.strayAnthropicKey) {
       bannerKind = "api_key";
       bannerMessage =

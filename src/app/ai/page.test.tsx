@@ -39,6 +39,7 @@ function status(overrides: Partial<AiStatusDto> = {}): AiStatusDto {
     },
     activeModel: null,
     activeModelLabel: null,
+    serverlessHost: false,
     ...overrides,
   };
 }
@@ -114,5 +115,83 @@ describe("AI connections page", () => {
     });
     expect(screen.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled();
     expect(screen.queryByText("CLI not installed")).toBeNull();
+  });
+
+  it("offers setup-token and ChatGPT connect on a serverless host", async () => {
+    mockStatus(
+      status({
+        serverlessHost: true,
+        bannerKind: "none",
+        bannerMessage:
+          "AI lookup on Vercel needs a Claude setup-token, a ChatGPT login, or OPENAI_API_KEY.",
+        providers: [
+          {
+            id: "claude",
+            available: false,
+            detail: "Paste a Claude setup-token. Vercel cannot spawn Claude Code.",
+            reason: "serverless",
+            cliInstalled: false,
+          },
+          {
+            id: "codex",
+            available: false,
+            detail: "Connect ChatGPT. Vercel cannot spawn the Codex CLI.",
+            reason: "serverless",
+            cliInstalled: false,
+          },
+          { id: "openai", available: false, detail: "no key", reason: "missing" },
+        ],
+      }),
+    );
+    render(<AiPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled();
+    });
+    expect(screen.queryByRole("button", { name: "Connect Claude" })).toBeNull();
+    expect(screen.queryByText("CLI not installed")).toBeNull();
+    expect(screen.queryByText(/Install the CLI on that computer/i)).toBeNull();
+    expect(screen.queryByText(/not found on PATH/i)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /I already have a claude setup-token/i }),
+    ).toBeVisible();
+    expect(screen.getByText("claude setup-token")).toBeVisible();
+  });
+
+  it("lets you disconnect a pasted Claude token on a serverless host", async () => {
+    mockStatus(
+      status({
+        serverlessHost: true,
+        aiAvailable: true,
+        provider: "claude",
+        providerLabel: "Claude Code (OAuth token)",
+        bannerKind: "ok",
+        bannerMessage: null,
+        providers: [
+          {
+            id: "claude",
+            available: true,
+            detail: "Claude subscription token",
+            authMethod: "oauth_token",
+            cliInstalled: false,
+          },
+          {
+            id: "codex",
+            available: false,
+            detail: "Connect ChatGPT. Vercel cannot spawn the Codex CLI.",
+            reason: "serverless",
+            cliInstalled: false,
+          },
+          { id: "openai", available: false, detail: "no key", reason: "missing" },
+        ],
+      }),
+    );
+    render(<AiPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Disconnect" })).toBeEnabled();
+    });
+    expect(screen.queryByRole("button", { name: "Connect Claude" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled();
   });
 });

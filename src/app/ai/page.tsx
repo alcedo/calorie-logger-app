@@ -65,8 +65,13 @@ export default function AiPage() {
         if (data.login?.phase === "failed") {
           setError(data.login.error || "ChatGPT login failed");
         }
-      } catch {
-        /* session expired */
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (/No such login session/i.test(message)) {
+          setLogin(null);
+          return;
+        }
+        setError(message);
       }
     }, 2000);
     return () => clearInterval(t);
@@ -151,10 +156,11 @@ export default function AiPage() {
 
   const claude = providerState(status, "claude");
   const codex = providerState(status, "codex");
+  const serverless = Boolean(status?.serverlessHost);
   const claudeOn = Boolean(claude?.available);
   const codexOn = Boolean(codex?.available);
-  const claudeCliMissing = claude?.cliInstalled === false;
-  const codexCliMissing = codex?.cliInstalled === false;
+  const claudeCliMissing = !serverless && claude?.cliInstalled === false;
+  const codexCliMissing = !serverless && codex?.cliInstalled === false;
   const claudeConnectBlocked = !status || claudeCliMissing;
   const codexConnectBlocked = !status || codexCliMissing;
   const anyCliMissing = claudeCliMissing || codexCliMissing;
@@ -164,17 +170,24 @@ export default function AiPage() {
       <header>
         <h1 className="text-lg font-semibold text-zinc-100">AI connections</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Link the Claude or ChatGPT subscription you already pay for. No API
-          keys. Unknown foods then look up automatically — the model searches
-          USDA, Open Food Facts, and the web, and you can watch its thought
-          process while logging.
+          {serverless
+            ? "Bring your Claude or ChatGPT subscription. Paste a Claude setup-token or connect ChatGPT. This host calls those APIs over HTTP because it cannot spawn the CLIs."
+            : "Link the Claude or ChatGPT subscription you already pay for. No API keys. Unknown foods then look up automatically — the model searches USDA, Open Food Facts, and the web, and you can watch its thought process while logging."}
         </p>
-        {anyCliMissing && (
+        {serverless ? (
+          <p className="mt-2 text-sm text-amber-300/90">
+            On a computer with Claude Code, run <code>claude setup-token</code>{" "}
+            and paste it below. ChatGPT uses the same device login as Codex.
+            You can also set <code>CLAUDE_CODE_OAUTH_TOKEN</code> or{" "}
+            <code>CODEX_AUTH_JSON</code> on the Vercel project so a cold start
+            keeps the credential.
+          </p>
+        ) : anyCliMissing ? (
           <p className="mt-2 text-sm text-amber-300/90">
             Connect runs on this app&apos;s server, not on your phone. Install
             the CLI on that computer, then refresh this page.
           </p>
-        )}
+        ) : null}
       </header>
 
       {status?.bannerKind === "ok" && status.providerLabel && (
@@ -214,7 +227,7 @@ export default function AiPage() {
           />
         </div>
 
-        {login?.provider === "claude" ? (
+        {!serverless && login?.provider === "claude" ? (
           <div className="mt-4 space-y-3">
             <p className="text-sm text-zinc-300">
               1. Open the Claude login page and sign in with your subscription.
@@ -253,7 +266,7 @@ export default function AiPage() {
               </button>
             </div>
           </div>
-        ) : (
+        ) : !serverless ? (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -273,7 +286,16 @@ export default function AiPage() {
               </button>
             )}
           </div>
-        )}
+        ) : claudeOn ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => disconnect("claude")}
+              className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : null}
 
         <button
           type="button"
@@ -362,7 +384,7 @@ export default function AiPage() {
             <button
               type="button"
               onClick={() => connect("codex")}
-              disabled={busy === "codex" || codexConnectBlocked}
+              disabled={busy === "codex" || (!serverless && codexConnectBlocked)}
               title={codexCliMissing ? codex?.detail : undefined}
               className="rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:opacity-100"
             >
@@ -383,9 +405,9 @@ export default function AiPage() {
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
         <h2 className="text-sm font-semibold text-zinc-200">Provider and model</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Choose which connected subscription (or paid OpenAI key) to use, and
-          which model it should call. Auto picks Claude if it is signed in,
-          otherwise ChatGPT.
+          {serverless
+            ? "Auto picks a pasted Claude token, then a ChatGPT login, then OPENAI_API_KEY."
+            : "Choose which connected subscription (or paid OpenAI key) to use, and which model it should call. Auto picks Claude if it is signed in, otherwise ChatGPT."}
         </p>
         <div className="mt-4">
           <AiPicker status={status} onChange={setPreference} showAllModels />

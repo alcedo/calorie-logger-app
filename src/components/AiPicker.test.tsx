@@ -31,6 +31,7 @@ function status(overrides: Partial<AiStatusDto> = {}): AiStatusDto {
     },
     activeModel: "sonnet",
     activeModelLabel: "Sonnet — balanced",
+    serverlessHost: false,
     ...overrides,
   };
 }

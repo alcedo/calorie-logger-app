@@ -15,7 +15,7 @@ These encode product requirements. Deleting, skipping, or weakening them is BLOC
 
 - `src/lib/fallback-parse.test.ts` — canonical smoke phrase `"2 eggs and 200g chicken breast"`; offline parser when no AI CLI is signed in
 - `src/app/api/log.integration.test.ts` — `POST /api/log` persist path, food lookup (exact / alias / fuzzy), and that long queries must not collapse onto short substring foods
-- `src/lib/ai.test.ts` + `src/lib/ai/env.test.ts` — `OPENAI_API_KEY` is never auto-selected; Anthropic API keys must be stripped from the Claude child env
+- `src/lib/ai.test.ts` + `src/lib/ai/env.test.ts` — local `OPENAI_API_KEY` is never auto-selected; Vercel (`VERCEL=1`) auto uses the key; Anthropic API keys must be stripped from the Claude child env
 - `src/lib/types.test.ts` — `todayLocalDate` is local calendar date, not UTC (midnight timezone bugs)
 - `src/lib/units.test.ts` — gram/kg/oz serving math and macro rounding
 - `src/db/index.integration.test.ts` — SQLite schema and seed behavior against a temp DB (`setupTempDatabase`)
@@ -25,7 +25,7 @@ These encode product requirements. Deleting, skipping, or weakening them is BLOC
 ## Hidden coupling
 
 - Food lookup is local SQLite first (`findFood` / aliases / fuzzy), then AI fallback; AI hits are cached back into `foods`. Changing normalize/fuzzy matching silently retargets logs onto the wrong food.
-- `AI_PROVIDER=auto` must not pick OpenAI even if `OPENAI_API_KEY` is set.
+- `AI_PROVIDER=auto` must not pick OpenAI on a local host even if `OPENAI_API_KEY` is set. On Vercel, auto prefers a Claude or ChatGPT subscription token over HTTP, then `OPENAI_API_KEY`.
 - Next.js in this repo has breaking APIs vs training data; check `node_modules/next/dist/docs/` before treating App Router / config changes as equivalent to older Next.
 - Integration tests use a temp SQLite DB, not `data/app.db`. Don't treat a missing `data/app.db` as a test failure.
 - Meal persist logic lives in `src/lib/log-meal.ts` (not only `src/app/api/log/route.ts`). Mocking `@/lib/ai` still works for log tests because `log-meal` imports those symbols.

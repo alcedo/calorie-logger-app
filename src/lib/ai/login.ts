@@ -13,6 +13,10 @@ import {
   cliNotFoundMessage,
   requireCliInstalled,
 } from "./run-cli";
+import { isServerlessHost, SERVERLESS_CONNECT_ERROR } from "../runtime";
+import { persistCodexAuth } from "./credentials";
+import { pollCodexDeviceAuth, startCodexDeviceAuth } from "./codex-auth";
+import { CODEX_DEVICE_VERIFY_URL } from "./codex-http";
 
 export type LoginKind = "claude" | "codex";
 
@@ -26,9 +30,18 @@ export interface LoginSessionPublic {
   error?: string;
 }
 
+export interface CodexDeviceState {
+  sessionId: string;
+  deviceAuthId: string;
+  userCode: string;
+  expiresAt: number;
+}
+
 interface LoginSession {
   public: LoginSessionPublic;
-  child: ChildProcess;
+  child: ChildProcess | null;
+  httpDevice?: { deviceAuthId: string; userCode: string };
+  stopHttp?: () => void;
   exitCode: number | null;
   closed: Promise<number | null>;
 }
@@ -54,22 +67,27 @@ function store(): Store {
   return g.__macroAiLogins;
 }
 
-function killChild(child: ChildProcess) {
+function signalChild(child: ChildProcess, signal: NodeJS.Signals) {
   try {
-    child.kill("SIGTERM");
-  } catch {
-    /* already gone */
+    child.kill(signal);
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err ? err.code : undefined;
+    if (code === "ESRCH") return;
+    throw err;
   }
+}
+
+function killChild(child: ChildProcess | null) {
+  if (!child) return;
+  signalChild(child, "SIGTERM");
   setTimeout(() => {
-    try {
-      child.kill("SIGKILL");
-    } catch {
-      /* ignore */
-    }
+    signalChild(child, "SIGKILL");
   }, 1500).unref();
 }
 
 function killSession(session: LoginSession) {
+  session.stopHttp?.();
   killChild(session.child);
 }
 
@@ -193,6 +211,7 @@ async function spawnUntilParsed(
 }
 
 export async function startClaudeLogin(): Promise<LoginSessionPublic> {
+  if (isServerlessHost()) throw new Error(SERVERLESS_CONNECT_ERROR);
   cancelProvider("claude");
   const { child, sessionBuf, closed } = await spawnUntilParsed(
     claudeBin(),
@@ -254,8 +273,8 @@ export async function completeClaudeLogin(
   if (!trimmed) throw new Error("Paste the code from the Claude login page.");
   session.public.phase = "completing";
   try {
-    session.child.stdin?.write(trimmed + "\n");
-    session.child.stdin?.end();
+    session.child?.stdin?.write(trimmed + "\n");
+    session.child?.stdin?.end();
   } catch {
     throw new Error("Could not send the code to Claude Code. Try connecting again.");
   }
@@ -283,7 +302,111 @@ export async function completeClaudeLogin(
   return session.public;
 }
 
+async function startCodexHttpLogin(): Promise<LoginSessionPublic> {
+  cancelProvider("codex");
+  const started = await startCodexDeviceAuth();
+  const sessionId = randomUUID();
+  const session: LoginSession = {
+    public: {
+      sessionId,
+      provider: "codex",
+      loginUrl: started.loginUrl,
+      userCode: started.userCode,
+      expiresAt: Date.now() + CODEX_TTL_MS,
+      phase: "awaiting_user",
+    },
+    child: null,
+    httpDevice: {
+      deviceAuthId: started.deviceAuthId,
+      userCode: started.userCode,
+    },
+    exitCode: null,
+    closed: Promise.resolve(null),
+  };
+  store().set(sessionId, session);
+  setTimeout(() => {
+    const current = store().get(sessionId);
+    if (
+      current &&
+      (current.public.phase === "awaiting_user" ||
+        current.public.phase === "completing")
+    ) {
+      current.public.phase = "failed";
+      current.public.error = "Login timed out. Try connecting again.";
+      killSession(current);
+      store().delete(sessionId);
+    }
+  }, CODEX_TTL_MS).unref();
+  return session.public;
+}
+
+export function codexDeviceState(sessionId: string): CodexDeviceState | null {
+  const session = store().get(sessionId);
+  if (!session?.httpDevice) return null;
+  return {
+    sessionId,
+    deviceAuthId: session.httpDevice.deviceAuthId,
+    userCode: session.httpDevice.userCode,
+    expiresAt: session.public.expiresAt,
+  };
+}
+
+export function restoreCodexHttpLogin(
+  device: CodexDeviceState,
+): LoginSessionPublic | null {
+  if (device.expiresAt <= Date.now()) return null;
+  const existing = store().get(device.sessionId);
+  if (existing) return existing.public;
+  const session: LoginSession = {
+    public: {
+      sessionId: device.sessionId,
+      provider: "codex",
+      loginUrl: CODEX_DEVICE_VERIFY_URL,
+      userCode: device.userCode,
+      expiresAt: device.expiresAt,
+      phase: "awaiting_user",
+    },
+    child: null,
+    httpDevice: {
+      deviceAuthId: device.deviceAuthId,
+      userCode: device.userCode,
+    },
+    exitCode: null,
+    closed: Promise.resolve(null),
+  };
+  store().set(device.sessionId, session);
+  return session.public;
+}
+
+export async function pollLogin(
+  sessionId: string,
+): Promise<LoginSessionPublic | undefined> {
+  const session = store().get(sessionId);
+  if (!session) return undefined;
+  if (session.httpDevice && session.public.phase === "awaiting_user") {
+    try {
+      const result = await pollCodexDeviceAuth(
+        session.httpDevice.deviceAuthId,
+        session.httpDevice.userCode,
+      );
+      if (result.status === "ready") {
+        persistCodexAuth(result.tokens);
+        session.public.phase = "done";
+        session.exitCode = 0;
+      }
+    } catch (err) {
+      session.public.phase = "failed";
+      session.public.error =
+        err instanceof Error ? err.message : "ChatGPT login failed.";
+    }
+  }
+  const snapshot = { ...session.public };
+  if (snapshot.phase === "done") store().delete(sessionId);
+  return snapshot;
+}
+
 export async function startCodexLogin(): Promise<LoginSessionPublic> {
+  if (isServerlessHost()) return startCodexHttpLogin();
   cancelProvider("codex");
   const { child, sessionBuf, closed } = await spawnUntilParsed(
     codexBin(),
@@ -360,6 +483,10 @@ export function cancelLogin(sessionId: string): void {
 
 export async function logoutProvider(provider: LoginKind): Promise<void> {
   cancelProvider(provider);
+  const { clearClaudeToken, clearCodexAuth } = await import("./credentials");
+  if (provider === "claude") clearClaudeToken();
+  else clearCodexAuth();
+  if (isServerlessHost()) return;
   const { runCli, PROBE_TIMEOUT_MS } = await import("./run-cli");
   if (provider === "claude") {
     await runCli({

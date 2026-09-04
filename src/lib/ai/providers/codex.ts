@@ -20,12 +20,45 @@ import type {
   GenerateJsonRequest,
   ProviderAvailability,
 } from "../types";
+import {
+  persistCodexAuth,
+  readCodexCredential,
+  replaceRequestCodexAuth,
+} from "../credentials";
+import {
+  generateJsonViaCodexHttp,
+  refreshCodexTokens,
+} from "../codex-http";
+import { isServerlessHost } from "../../runtime";
+
+function tokenAvailability(): ProviderAvailability | null {
+  const cred = readCodexCredential();
+  if (!cred) return null;
+  return {
+    available: true,
+    detail: "ChatGPT subscription token",
+    cliInstalled: false,
+  };
+}
 
 export const codexProvider: AiProvider = {
   id: "codex",
   label: "Codex CLI (ChatGPT login)",
 
   async isAvailable(): Promise<ProviderAvailability> {
+    if (isServerlessHost()) {
+      return (
+        tokenAvailability() ?? {
+          available: false,
+          detail:
+            "Connect ChatGPT. Vercel cannot spawn the Codex CLI.",
+          reason: "serverless",
+          cliInstalled: false,
+        }
+      );
+    }
+    const token = tokenAvailability();
+    if (token) return { ...token, cliInstalled: cliIsInstalled(codexBin(), codexChildEnv()) };
     const env = codexChildEnv();
     const command = codexBin();
     if (!cliIsInstalled(command, env)) {
@@ -77,6 +110,22 @@ export const codexProvider: AiProvider = {
   },
 
   async generateJson<T>(req: GenerateJsonRequest): Promise<T> {
+    const cred = readCodexCredential();
+    if (cred) {
+      try {
+        return await generateJsonViaCodexHttp(cred, req);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!/401|invalid_auth|unauthorized/i.test(message)) throw err;
+        const refreshed = await refreshCodexTokens(cred);
+        persistCodexAuth(refreshed);
+        replaceRequestCodexAuth(refreshed);
+        return generateJsonViaCodexHttp(refreshed, req);
+      }
+    }
+    if (isServerlessHost()) {
+      throw new Error("Connect ChatGPT. Vercel cannot spawn the Codex CLI.");
+    }
     const env = codexChildEnv();
     const cwd = await mkdtemp(join(tmpdir(), "macro-codex-"));
     const schemaPath = join(cwd, "schema.json");

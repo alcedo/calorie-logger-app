@@ -25,6 +25,7 @@ import {
   searchNutritionWeb,
   searchQueryFor,
 } from "@/lib/nutrition-search";
+import { isServerlessHost } from "../runtime";
 import type { LogTraceListener } from "../log-trace";
 import type {
   AiNutrition,
@@ -135,6 +136,7 @@ export async function getAiStatus(): Promise<AiStatusDto> {
   }
 
   const selection = readSelection();
+  const serverlessHost = isServerlessHost();
   const probed = await probeAll();
   const providers = (["claude", "codex", "openai"] as const).map((id) =>
     toDto(id, probed[id]),
@@ -144,6 +146,7 @@ export async function getAiStatus(): Promise<AiStatusDto> {
     probed,
     strayAnthropicKey: hasStrayAnthropicKey(),
     invalidProviderRaw: process.env.AI_PROVIDER,
+    serverlessHost,
   });
 
   const models = {
@@ -170,6 +173,7 @@ export async function getAiStatus(): Promise<AiStatusDto> {
       view.provider && activeModel !== null
         ? labelForModel(view.provider, activeModel)
         : null,
+    serverlessHost,
   };
   statusCache = { at: now, value };
   return value;
