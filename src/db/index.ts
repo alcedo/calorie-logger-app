@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
@@ -66,17 +67,25 @@ declare global {
   var __calorieLoggerSqlite: Database.Database | undefined;
 }
 
-function resolveDbPath(dbFilePath?: string): string {
+export function resolveDbPath(dbFilePath?: string): string {
   if (dbFilePath) return dbFilePath;
   if (process.env.CALORIE_LOGGER_DB_PATH) {
     return process.env.CALORIE_LOGGER_DB_PATH;
+  }
+  if (process.env.VERCEL) {
+    return path.join(os.tmpdir(), "calorie-logger.db");
   }
   return path.join(process.cwd(), "data", "app.db");
 }
 
 function createDb(dbFilePath?: string): DrizzleDb {
   const filePath = resolveDbPath(dbFilePath);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`Cannot create SQLite directory for ${filePath}: ${reason}`);
+  }
   const sqlite = new Database(filePath);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
