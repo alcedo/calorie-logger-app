@@ -31,7 +31,7 @@ export async function overlayFromNextCookies(): Promise<CredentialOverlay> {
     const jar = await cookies();
     return {
       claudeToken: jar.get(CLAUDE_OAUTH_COOKIE)?.value,
-      codexAuth: parseCodexAuthJson(jar.get(CODEX_AUTH_COOKIE)?.value),
+      codexAuth: parseCodexAuthJson(jar.get(CODEX_AUTH_COOKIE)?.value) ?? undefined,
     };
   } catch {
     return {};

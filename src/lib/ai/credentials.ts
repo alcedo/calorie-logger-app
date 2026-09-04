@@ -155,6 +155,6 @@ export function overlayFromCookieHeader(
   }
   return {
     claudeToken: map[CLAUDE_OAUTH_COOKIE],
-    codexAuth: parseCodexAuthJson(map[CODEX_AUTH_COOKIE]),
+    codexAuth: parseCodexAuthJson(map[CODEX_AUTH_COOKIE]) ?? undefined,
   };
 }
