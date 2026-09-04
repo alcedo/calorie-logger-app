@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import type { FoodDto, GoalsDto } from "@/lib/types";
 
 const SOURCE_BADGE: Record<FoodDto["source"], { label: string; cls: string }> =
@@ -15,14 +16,14 @@ function GoalsEditor() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch("/api/goals")
+    apiFetch("/api/goals")
       .then((r) => r.json())
       .then((d) => setGoals(d.goals));
   }, []);
 
   async function save() {
     if (!goals) return;
-    await fetch("/api/goals", {
+    await apiFetch("/api/goals", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(goals),
@@ -75,7 +76,7 @@ export default function FoodsPage() {
   const [editing, setEditing] = useState<FoodDto | null>(null);
 
   const load = useCallback(async (q: string) => {
-    const res = await fetch(`/api/foods${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+    const res = await apiFetch(`/api/foods${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     const data = await res.json();
     setFoodList(data.foods);
   }, []);
@@ -87,7 +88,7 @@ export default function FoodsPage() {
 
   async function saveEdit() {
     if (!editing) return;
-    await fetch(`/api/foods/${editing.id}`, {
+    await apiFetch(`/api/foods/${editing.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(editing),
@@ -97,7 +98,7 @@ export default function FoodsPage() {
   }
 
   async function remove(id: number) {
-    await fetch(`/api/foods/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/foods/${id}`, { method: "DELETE" });
     load(query);
   }
 

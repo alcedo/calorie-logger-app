@@ -138,7 +138,7 @@ describe("foods API", () => {
 describe("goals API", () => {
   it("GET returns default goals", async () => {
     const { GET } = await import("@/app/api/goals/route");
-    const res = await GET();
+    const res = await GET(jsonRequest("GET", "/api/goals"));
     const { body } = await readJson<{
       goals: { calories: number; protein: number };
     }>(res);
@@ -210,7 +210,7 @@ describe("history and status APIs", () => {
     const off = await readJson<{
       aiAvailable: boolean;
       providers: Array<{ id: string; cliInstalled?: boolean }>;
-    }>(await GET());
+    }>(await GET(jsonRequest("GET", "/api/status")));
     expect(off.body.aiAvailable).toBe(false);
     expect(off.body.providers.find((p) => p.id === "claude")?.cliInstalled).toBe(
       false,
@@ -221,12 +221,16 @@ describe("history and status APIs", () => {
 
     process.env.OPENAI_API_KEY = "x";
     clearAiStatusCache();
-    const keyOnly = await readJson<{ aiAvailable: boolean }>(await GET());
+    const keyOnly = await readJson<{ aiAvailable: boolean }>(
+      await GET(jsonRequest("GET", "/api/status")),
+    );
     expect(keyOnly.body.aiAvailable).toBe(false);
 
     process.env.AI_PROVIDER = "openai";
     clearAiStatusCache();
-    const on = await readJson<{ aiAvailable: boolean }>(await GET());
+    const on = await readJson<{ aiAvailable: boolean }>(
+      await GET(jsonRequest("GET", "/api/status")),
+    );
     expect(on.body.aiAvailable).toBe(true);
 
     if (originalKey === undefined) delete process.env.OPENAI_API_KEY;

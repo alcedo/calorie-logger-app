@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { entries, foods } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { withUser } from "@/lib/auth";
 import { servingsFor, macrosForServings } from "@/lib/units";
 
-export async function DELETE(
+export const DELETE = withUser(async (
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { params }: { params: Promise<{ id: string }> },
+) => {
   const { id } = await params;
   const deleted = db
     .delete(entries)
@@ -18,12 +19,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Entry not found" }, { status: 404 });
   }
   return NextResponse.json({ deleted });
-}
+});
 
-export async function PATCH(
+export const PATCH = withUser(async (
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { params }: { params: Promise<{ id: string }> },
+) => {
   const { id } = await params;
   const body = await req.json().catch(() => null);
   const quantity = Number(body?.quantity);
@@ -70,4 +71,4 @@ export async function PATCH(
     .get();
 
   return NextResponse.json({ updated });
-}
+});

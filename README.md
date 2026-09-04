@@ -29,18 +29,20 @@ Pick a **provider and model** on the Today page or the AI page. Claude Code logi
 ```bash
 npm install
 bash scripts/install-ai-clis.sh   # Claude Code + Codex CLIs into ~/.local/bin
-# Sign in with Claude Code (uses your subscription, no API key):
-claude auth login
+# Create a Google OAuth client (scopes: openid email profile) and set:
+#   AUTH_SECRET  (at least 32 characters)
+#   GOOGLE_CLIENT_ID
+#   GOOGLE_CLIENT_SECRET
 npm run dev
 ```
 
-Open http://localhost:3000. The SQLite database is created and seeded automatically at `data/app.db` on first request.
+Open http://localhost:3000 and sign in with Google. We store your email and name only. Each user gets their own SQLite file under `data/users/<id>/app.db` and their own Claude/Codex config dirs. The first Google user can adopt a leftover `data/app.db` if one exists.
 
 ## How to try the hosted app
 
 Open https://calorie-logger-app.vercel.app and log a built-in food, for example `2 eggs and 200g chicken breast`.
 
-Vercel Functions cannot write under the app directory, so the host stores SQLite in the instance tmp directory (`calorie-logger.db`). A cold start starts from an empty seeded database. Claude Code and Codex logins do not run on Vercel. Those CLIs are not installed there.
+Vercel Functions cannot write under the app directory, so the host stores per-user SQLite under the instance tmp directory. A cold start starts from empty seeded databases. Claude Code and Codex logins do not run on Vercel. Those CLIs are not installed there.
 
 Without a signed-in CLI, the app still works for foods already in the database (a simple built-in parser handles inputs like "2 eggs and 200g chicken breast"), but unknown foods can't be looked up.
 
@@ -54,9 +56,7 @@ Install [Claude Code](https://code.claude.com) and run `claude auth login`. The 
 
 Do **not** set `ANTHROPIC_API_KEY`. If it is exported, `claude -p` bills the API console instead of your subscription. The app strips that variable from the subprocess environment; if the status banner still reports an API-key login, run `unset ANTHROPIC_API_KEY`.
 
-`claude setup-token` into `CLAUDE_CODE_OAUTH_TOKEN` is a fallback for servers with no browser (containers, CI, detached daemons). It prints once, saves nothing, lasts a year, and **does not refresh** — when it expires the app 401s until you regenerate it and restart. Prefer `claude auth login` for local `next dev`.
-
-This is a single-user local tool. Do not host it for other people against your subscription; that is routing Claude through one plan on behalf of users, which Anthropic does not allow.
+Each user connects Claude from the AI page (`claude auth login` in that user's config dir, or a setup-token stored in their database). The host process `CLAUDE_CODE_OAUTH_TOKEN` is never forwarded into another user's CLI. Do not share one Claude plan across people.
 
 ### Codex (ChatGPT login)
 
@@ -72,13 +72,15 @@ See [`.env.example`](.env.example). Useful variables:
 
 | Variable | Purpose |
 | --- | --- |
+| `AUTH_SECRET` | Session signing secret (at least 32 characters) |
+| `GOOGLE_CLIENT_ID` | Google OAuth client id |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `AI_PROVIDER` | `auto` (default), `claude`, `codex`, `openai`, `none` |
 | `AI_CLAUDE_MODEL` | Optional Claude model if the in-app picker has not set one (e.g. `haiku`) |
 | `AI_CODEX_MODEL` | Optional Codex model if the in-app picker has not set one |
 | `OPENAI_MODEL` | OpenAI model if the in-app picker has not set one (default `gpt-4o-mini`) |
 | `USDA_API_KEY` | Optional [FoodData Central](https://fdc.nal.usda.gov/api-guide.html) key; falls back to `DEMO_KEY` |
 | `AI_CLI_TIMEOUT_MS` | Subprocess timeout, minimum 20000, default 60000 |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Headless fallback; prefer `claude auth login` |
 | `OPENAI_API_KEY` | Paid opt-in; requires `AI_PROVIDER=openai` |
 
 Verify a signed-in setup with `npm run ai:doctor`. Unauthenticated CLI wiring can be checked with `npm run ai:cli-smoke`.
@@ -91,7 +93,7 @@ npm run test:watch
 npm run test:e2e  # Playwright (Today / History / Foods flows)
 ```
 
-Unit tests cover parsing, normalization, unit conversion, components, and Claude/Codex login contracts (OSC-8 URLs, env sanitization, never auto-selecting OpenAI). Integration tests use an isolated temp SQLite file (`CALORIE_LOGGER_DB_PATH` / `resetDbForTests`) so they never touch `data/app.db`. CLI login tests use fake binaries; they do not call Anthropic or OpenAI. Playwright boots `next dev` against a temp DB with AI disabled.
+Unit tests cover parsing, normalization, unit conversion, components, and Claude/Codex login contracts (OSC-8 URLs, env sanitization, never auto-selecting OpenAI). Integration tests use an isolated temp SQLite file (`resetDbForTests` plus a minted session cookie) so they never touch `data/app.db`. CLI login tests use fake binaries; they do not call Anthropic or OpenAI. Playwright boots `next dev` against a temp per-user dir with a minted session and AI disabled.
 
 After you connect a subscription, `npm run ai:doctor` runs a live meal parse. `npm run ai:cli-smoke` checks unauthenticated CLI flags (`--max-turns`, rejection of `--ask-for-approval`).
 

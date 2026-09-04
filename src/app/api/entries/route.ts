@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { entries, goals } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
+import { withUser } from "@/lib/auth";
 
-export async function GET(req: NextRequest) {
+export const GET = withUser(async (req: NextRequest) => {
   const date =
     req.nextUrl.searchParams.get("date") ??
     new Date().toISOString().slice(0, 10);
@@ -31,4 +32,4 @@ export async function GET(req: NextRequest) {
   const userGoals = db.select().from(goals).where(eq(goals.id, 1)).get();
 
   return NextResponse.json({ date, entries: dayEntries, totals, goals: userGoals });
-}
+});

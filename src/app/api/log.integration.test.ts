@@ -3,7 +3,12 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { entries, foods } from "@/db/schema";
 import { findFood, cacheFood } from "@/lib/food-lookup";
-import { jsonRequest, readJson, setupTempDatabase } from "@/test/helpers";
+import {
+  ambientAuthCookie,
+  jsonRequest,
+  readJson,
+  setupTempDatabase,
+} from "@/test/helpers";
 
 setupTempDatabase();
 
@@ -86,7 +91,14 @@ describe("POST /api/log", () => {
     const { POST } = await import("@/app/api/log/route");
     const req = new (await import("next/server")).NextRequest(
       "http://localhost:3000/api/log",
-      { method: "POST", body: "not-json", headers: { "Content-Type": "application/json" } }
+      {
+        method: "POST",
+        body: "not-json",
+        headers: {
+          "Content-Type": "application/json",
+          cookie: ambientAuthCookie(),
+        },
+      },
     );
     const res = await POST(req);
     expect(res.status).toBe(400);

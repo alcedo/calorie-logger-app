@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { goals } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { withUser } from "@/lib/auth";
 
-export async function GET() {
+export const GET = withUser(async (_req: NextRequest) => {
   const row = db.select().from(goals).where(eq(goals.id, 1)).get();
   return NextResponse.json({ goals: row });
-}
+});
 
-export async function PUT(req: NextRequest) {
+export const PUT = withUser(async (req: NextRequest) => {
   const body = await req.json().catch(() => null);
   const fields = ["calories", "protein", "carbs", "fat"] as const;
   const updates: Record<string, number> = {};
@@ -26,4 +27,4 @@ export async function PUT(req: NextRequest) {
     .returning()
     .get();
   return NextResponse.json({ goals: updated });
-}
+});

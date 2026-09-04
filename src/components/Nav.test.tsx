@@ -24,9 +24,16 @@ vi.mock("next/link", () => ({
 }));
 
 describe("Nav", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it("renders brand and primary links", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }),
+    );
     render(<Nav />);
     expect(screen.getByText("Macro")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Today/i })).toHaveAttribute(
@@ -45,5 +52,20 @@ describe("Nav", () => {
       "href",
       "/ai"
     );
+  });
+
+  it("shows the signed-in name and sign out", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          user: { name: "Ada Lovelace", email: "ada@example.com" },
+        }),
+      }),
+    );
+    render(<Nav />);
+    expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sign out/i })).toBeInTheDocument();
   });
 });

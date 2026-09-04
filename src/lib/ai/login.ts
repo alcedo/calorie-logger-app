@@ -13,6 +13,7 @@ import {
   cliNotFoundMessage,
   requireCliInstalled,
 } from "./run-cli";
+import { slot } from "@/lib/tenant";
 
 export type LoginKind = "claude" | "codex";
 
@@ -47,11 +48,8 @@ function startWaitMs(): number {
 
 type Store = Map<string, LoginSession>;
 
-const g = globalThis as unknown as { __macroAiLogins?: Store };
-
 function store(): Store {
-  if (!g.__macroAiLogins) g.__macroAiLogins = new Map();
-  return g.__macroAiLogins;
+  return slot("ai-logins", () => new Map());
 }
 
 function killChild(child: ChildProcess) {
@@ -226,14 +224,15 @@ export async function startClaudeLogin(): Promise<LoginSessionPublic> {
       session.public.error = "Login cancelled or expired.";
     }
   });
-  store().set(sessionId, session);
+  const sessions = store();
+  sessions.set(sessionId, session);
   setTimeout(() => {
-    const current = store().get(sessionId);
+    const current = sessions.get(sessionId);
     if (current && current.public.phase === "awaiting_user") {
       current.public.phase = "failed";
       current.public.error = "Login timed out. Try connecting again.";
       killSession(current);
-      store().delete(sessionId);
+      sessions.delete(sessionId);
     }
   }, CLAUDE_TTL_MS).unref();
   return session.public;
@@ -322,9 +321,10 @@ export async function startCodexLogin(): Promise<LoginSessionPublic> {
       }
     }
   });
-  store().set(sessionId, session);
+  const sessions = store();
+  sessions.set(sessionId, session);
   setTimeout(() => {
-    const current = store().get(sessionId);
+    const current = sessions.get(sessionId);
     if (
       current &&
       (current.public.phase === "awaiting_user" || current.public.phase === "completing")
@@ -332,7 +332,7 @@ export async function startCodexLogin(): Promise<LoginSessionPublic> {
       current.public.phase = "failed";
       current.public.error = "Login timed out. Try connecting again.";
       killSession(current);
-      store().delete(sessionId);
+      sessions.delete(sessionId);
     }
   }, CODEX_TTL_MS).unref();
   return session.public;

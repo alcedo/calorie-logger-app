@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { EntryList } from "@/components/EntryList";
+import { apiFetch } from "@/lib/api";
 import type { EntryDto, GoalsDto } from "@/lib/types";
 
 interface DaySummary {
@@ -31,8 +32,8 @@ export default function HistoryPage() {
 
   function load() {
     return Promise.all([
-      fetch("/api/history?days=60").then((r) => r.json()),
-      fetch("/api/goals").then((r) => r.json()),
+      apiFetch("/api/history?days=60").then((r) => r.json()),
+      apiFetch("/api/goals").then((r) => r.json()),
     ]).then(([history, g]) => {
       setDays(history.days);
       setGoals(g.goals);
@@ -51,7 +52,7 @@ export default function HistoryPage() {
     }
     setExpanded(date);
     if (!dayEntries[date]) {
-      const res = await fetch(`/api/entries?date=${date}`);
+      const res = await apiFetch(`/api/entries?date=${date}`);
       const data = await res.json();
       setDayEntries((prev) => ({ ...prev, [date]: data.entries }));
     }
@@ -120,7 +121,7 @@ export default function HistoryPage() {
                       <EntryList
                         entries={dayEntries[d.date]}
                         onChanged={async () => {
-                          const res = await fetch(`/api/entries?date=${d.date}`);
+                          const res = await apiFetch(`/api/entries?date=${d.date}`);
                           const data = await res.json();
                           setDayEntries((prev) => ({
                             ...prev,

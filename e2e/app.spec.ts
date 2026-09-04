@@ -2,6 +2,20 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
+test("login page is shown without a session", async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await page.goto("/login");
+  await expect(page.getByRole("heading", { name: /Sign in to Macro/i })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Continue with Google/i }),
+  ).toBeVisible();
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login/);
+  await context.close();
+  expect(baseURL).toBeTruthy();
+});
+
 test("Today: AI-off banner and log meal updates dashboard", async ({
   page,
 }) => {
@@ -22,6 +36,8 @@ test("Today: AI-off banner and log meal updates dashboard", async ({
   await expect(page.getByText("Thought process")).toBeVisible();
   await expect(page.getByText(/built-in parser/i).first()).toBeVisible();
   await expect(page.getByLabel("AI provider")).toBeVisible();
+  await expect(page.getByText("E2E User")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Sign out/i })).toBeVisible();
 });
 
 test("AI page: provider and model pickers", async ({ page }) => {

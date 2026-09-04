@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setupTempDatabase } from "@/test/helpers";
+
+setupTempDatabase();
 
 const createMock = vi.fn();
 const searchNutritionWeb = vi.fn();
@@ -58,6 +61,19 @@ describe("ai module", () => {
     process.env.OPENAI_API_KEY = "test-key";
     const { getAiStatus } = await import("./ai");
     const status = await getAiStatus();
+    expect(status.aiAvailable).toBe(false);
+    expect(status.provider).toBeNull();
+  });
+
+  it("ignores a stored openai preference unless the host opted in", async () => {
+    process.env.OPENAI_API_KEY = "test-key";
+    delete process.env.AI_PROVIDER;
+    const { setSetting, SETTING_AI_PROVIDER } = await import("@/lib/settings");
+    setSetting(SETTING_AI_PROVIDER, "openai");
+    const { getAiStatus, clearAiStatusCache } = await import("./ai");
+    clearAiStatusCache();
+    const status = await getAiStatus();
+    expect(status.selection).toBe("auto");
     expect(status.aiAvailable).toBe(false);
     expect(status.provider).toBeNull();
   });

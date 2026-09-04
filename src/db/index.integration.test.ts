@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, resetDbForTests } from "@/db";
+import { clearTenantHandles } from "@/lib/tenant";
 import { foods, goals } from "@/db/schema";
 import { SEED_FOODS } from "@/db/seed-data";
 
@@ -12,16 +13,7 @@ describe("createDb / seed idempotency", () => {
   const dbPath = path.join(dir, "seed.db");
 
   afterAll(() => {
-    const sqlite = globalThis.__calorieLoggerSqlite;
-    if (sqlite) {
-      try {
-        sqlite.close();
-      } catch {
-        // ignore
-      }
-    }
-    globalThis.__calorieLoggerSqlite = undefined;
-    globalThis.__calorieLoggerDb = undefined;
+    clearTenantHandles();
     for (const suffix of ["", "-wal", "-shm"]) {
       try {
         fs.unlinkSync(dbPath + suffix);

@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AiPicker } from "@/components/AiPicker";
+import { apiFetch } from "@/lib/api";
 import type { AiLoginSessionDto, AiStatusDto, ProviderId } from "@/lib/ai/types";
 
 type ProviderCard = "claude" | "codex";
 
 async function postAi(body: Record<string, unknown>) {
-  const res = await fetch("/api/ai", {
+  const res = await apiFetch("/api/ai", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -35,7 +36,7 @@ export default function AiPage() {
   const [showToken, setShowToken] = useState(false);
 
   const refresh = useCallback(() => {
-    return fetch("/api/status")
+    return apiFetch("/api/status")
       .then((r) => r.json())
       .then((d: AiStatusDto) => {
         setStatus(d);

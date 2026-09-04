@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeAll, describe, it } from "vitest";
 import { fileURLToPath } from "node:url";
+import { setupTempDatabase } from "@/test/helpers";
 import {
   activeLogins,
   cancelLogin,
@@ -11,6 +12,8 @@ import {
   startClaudeLogin,
   startCodexLogin,
 } from "./login";
+
+setupTempDatabase();
 
 const fixtures = fileURLToPath(new URL("./fixtures", import.meta.url));
 const fakeClaude = join(fixtures, "fake-claude-login.mjs");
