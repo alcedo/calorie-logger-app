@@ -20,6 +20,7 @@
 # next.js
 /.next/
 /.next-verify*/
+/.next-vercel*/
 /out/
 
 # production

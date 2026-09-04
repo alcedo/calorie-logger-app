@@ -43,8 +43,8 @@ export type ResolvedAiStatusView = Pick<
 >;
 
 /**
- * Pure provider pick. Used by GET /api/status and unit tests so auto-select
- * cannot silently start billing OpenAI.
+ * Pure provider pick. Local auto never bills OpenAI. Serverless auto may,
+ * because CLIs cannot run there.
  */
 export function resolveAiStatusView(
   input: ResolveAiStatusInput,
